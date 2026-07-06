@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pregnancy-calendar",
+      "runtimeExecutable": "C:\\laragon\\bin\\nodejs\\node-v22\\node.exe",
+      "runtimeArgs": ["server.js"],
+      "port": 4010
+    }
+  ]
+}
