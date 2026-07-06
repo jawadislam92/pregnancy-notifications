@@ -23,8 +23,13 @@
   .btn.ghost{ background:#fff; border:1px solid var(--line); color:var(--ink); }
   .btn:disabled{ opacity:.55; cursor:default; }
   main{ padding:0; }
-  iframe{ width:100%; height:calc(100vh - 66px); border:0; background:#efe9e1; display:block; }
+  iframe{ width:100%; height:calc(100vh - 132px); border:0; background:#efe9e1; display:block; }
   .note{ font-size:12px; color:#8a8397; }
+  .plan{ display:flex; gap:8px; overflow-x:auto; padding:8px 16px; background:#f6f1ea; border-bottom:1px solid var(--line); }
+  .chip{ flex:0 0 auto; display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:9px; padding:6px 10px; font-size:12px; white-space:nowrap; }
+  .chip b{ color:var(--pink); }
+  .chip .pg{ background:var(--pink); color:#fff; border-radius:5px; padding:1px 6px; font-size:11px; font-weight:700; }
+  .chip .mo{ color:#8a8397; }
 </style>
 </head>
 <body>
@@ -49,6 +54,7 @@
     <button class="btn ghost" id="pdf">⬇ Download PDF</button>
   </div>
 </header>
+<div class="plan" id="plan"></div>
 <main>
   <iframe id="frame" src="/preview?due=2026-10-15&lang=en"></iframe>
 </main>
@@ -57,7 +63,20 @@
   const frame = document.getElementById('frame');
   const due = document.getElementById('due');
   function url(base){ return base + '?due=' + encodeURIComponent(due.value) + '&lang=' + lang; }
-  function refresh(){ frame.src = url('/preview'); }
+  function refresh(){
+    // Always force a fresh load (nonce) so Update never looks like a no-op.
+    frame.src = url('/preview') + '&_=' + Date.now();
+    loadPlan();
+  }
+  async function loadPlan(){
+    try{
+      const rows = await (await fetch(url('/plan') + '&_=' + Date.now())).json();
+      document.getElementById('plan').innerHTML = rows.map(r =>
+        '<div class="chip"><span class="pg">' + r.page + '</span> <b>Week ' + r.week +
+        '</b> <span class="mo">' + r.month + ' ' + r.year + '</span> · ' + r.fruit + '</div>'
+      ).join('');
+    }catch(e){ /* ignore */ }
+  }
   document.getElementById('update').onclick = refresh;
   due.onchange = refresh;
   document.querySelectorAll('#lang button').forEach(b => b.onclick = () => {
@@ -65,6 +84,7 @@
     document.querySelectorAll('#lang button').forEach(x => x.classList.toggle('on', x === b));
     refresh();
   });
+  loadPlan();
   document.getElementById('pdf').onclick = () => {
     const btn = document.getElementById('pdf');
     btn.disabled = true; btn.textContent = 'Generating…';

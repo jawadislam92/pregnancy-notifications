@@ -2,10 +2,14 @@ const express = require('express');
 const path = require('path');
 const { buildPages } = require('./src/dateEngine');
 const { renderDocument, PAGE_W, PAGE_H } = require('./src/renderPage');
+const { MONTHS } = require('./src/layout');
 const weeks = require('./src/weeks');
 
 const app = express();
 const PORT = process.env.PORT || 4010;
+// Changes every server start, so browsers/preview panels never serve stale
+// artwork from a previous build (image URLs carry ?v=ASSET_VERSION).
+const ASSET_VERSION = String(Date.now());
 
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -21,7 +25,23 @@ app.get('/preview', (req, res) => {
   const { due, lang } = params(req);
   const forPrint = req.query.print === '1';
   const pages = buildPages(due);
-  res.type('html').send(renderDocument({ dueDate: due, lang, weeks, pages, forPrint }));
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('html').send(renderDocument({ dueDate: due, lang, weeks, pages, forPrint, assetVersion: ASSET_VERSION }));
+});
+
+// Page map: which week / month / fruit each of the 10 pages shows (for verification)
+app.get('/plan', (req, res) => {
+  const { due, lang } = params(req);
+  const pages = buildPages(due);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(pages.map((p, i) => ({
+    page: i + 1,
+    week: weeks[i].week,
+    month: MONTHS[lang][p.month],
+    year: p.year,
+    fruit: weeks[i].fruit[lang],
+    highlight: p.markerStart === p.markerEnd ? `${p.markerStart}` : `${p.markerStart}–${p.markerEnd}`
+  })));
 });
 
 // Print-ready 10-page PDF (drives a headless Chromium over the live preview URL)

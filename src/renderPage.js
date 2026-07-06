@@ -27,7 +27,7 @@ function roleDiv(role, content, theme) {
   return `<div style="${s.join(';')}">${content}</div>`;
 }
 
-function renderCalendar(page, theme) {
+function renderCalendar(page, theme, ver) {
   const parts = [];
   // Grid lines (subtle, matching the original)
   const gridBottom = CAL.rowTop + page.rows * CAL.rowH;
@@ -64,14 +64,14 @@ function renderCalendar(page, theme) {
       parts.push(`<div style="position:absolute;left:${cx + CAL.numDx}px;top:${cy + CAL.numDy}px;font-family:var(--f-sans);font-weight:${wt};font-size:${CAL.numSize}px;color:${col}">${String(day).padStart(2, '0')}</div>`);
       // flower markers on first & last highlighted day
       if (day === page.markerStart || day === page.markerEnd) {
-        parts.push(`<img src="/assets/deco/flower.png" style="position:absolute;left:${cx + CAL.colW - 40}px;top:${cy + 2}px;width:30px;height:30px;object-fit:contain">`);
+        parts.push(`<img src="/assets/deco/flower.png?v=${ver}" style="position:absolute;left:${cx + CAL.colW - 40}px;top:${cy + 2}px;width:30px;height:30px;object-fit:contain">`);
       }
     });
   });
   return parts.join('\n');
 }
 
-function renderPage(pageDesc, week, theme, lang) {
+function renderPage(pageDesc, week, theme, lang, ver) {
   const ui = UI[lang];
   WEEKDAYS._lang = WEEKDAYS[lang];
   const parts = [];
@@ -107,17 +107,18 @@ function renderPage(pageDesc, week, theme, lang) {
     `${esc(week.callout.label[lang])}:&nbsp;</span>${esc(week.callout.text[lang])}</div></div>`
   );
   // Calendar
-  parts.push(renderCalendar(pageDesc, theme));
+  parts.push(renderCalendar(pageDesc, theme, ver));
 
-  const bg = `/assets/base/week-${String(week.week).padStart(2, '0')}.png`;
-  return `<section class="page" style="background-image:url('${bg}')">${parts.join('\n')}</section>`;
+  const bg = `/assets/base/week-${String(week.week).padStart(2, '0')}.png?v=${ver}`;
+  return `<section class="page" data-week="${week.week}" style="background-image:url('${bg}')">${parts.join('\n')}</section>`;
 }
 
-function renderDocument({ dueDate, lang, weeks, pages, forPrint }) {
+function renderDocument({ dueDate, lang, weeks, pages, forPrint, assetVersion }) {
+  const ver = assetVersion || '1';
   const body = pages.map((p, i) => {
     const week = weeks[i];
     const theme = { primary: week.primary, accent: week.accent, grey: NEUTRAL };
-    return renderPage(p, week, theme, lang);
+    return renderPage(p, week, theme, lang, ver);
   }).join('\n');
 
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">
