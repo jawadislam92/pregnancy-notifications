@@ -26,19 +26,81 @@ const PORT = process.env.PORT || 4010;
 const ASSET_VERSION = String(Date.now());
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
-// Optional password gate (HTTP Basic). Off unless STUDIO_PASSWORD is set —
-// strongly recommended when the app is reachable from the internet.
+// ---- Auth: a branded login page backed by a signed session cookie ----------
+const crypto = require('crypto');
 const AUTH_USER = process.env.STUDIO_USER || 'admin';
-const AUTH_PASS = process.env.STUDIO_PASSWORD || '';
+const AUTH_PASS = process.env.STUDIO_PASSWORD || ''; // gate is off unless this is set
+const SESSION_SECRET = crypto.createHash('sha256').update((AUTH_PASS || 'dev') + '::pcs').digest();
+const INTERNAL_TOKEN = crypto.randomBytes(16).toString('hex'); // lets the PDF renderer reach /preview
+
+function makeToken(user) {
+  const body = user + '|' + (Date.now() + 7 * 864e5);
+  return Buffer.from(body).toString('base64url') + '.' +
+    crypto.createHmac('sha256', SESSION_SECRET).update(body).digest('base64url');
+}
+function verifyToken(tok) {
+  if (!tok || tok.indexOf('.') < 0) return null;
+  const [b64, sig] = tok.split('.');
+  let body; try { body = Buffer.from(b64, 'base64url').toString(); } catch { return null; }
+  const good = crypto.createHmac('sha256', SESSION_SECRET).update(body).digest('base64url');
+  if (sig.length !== good.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(good))) return null;
+  const [user, exp] = body.split('|');
+  return Date.now() < Number(exp) ? user : null;
+}
+function cookies(req) {
+  const out = {};
+  (req.headers.cookie || '').split(';').forEach((p) => { const i = p.indexOf('='); if (i > 0) out[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
+  return out;
+}
+const loginPage = (err) => `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · Pregnancy Calendar Studio</title>
+<style>
+ @font-face{font-family:'Script';src:url('/fonts/greatvibes.woff2') format('woff2');font-display:swap}
+ *{box-sizing:border-box} body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+  font-family:'Segoe UI',system-ui,sans-serif;color:#4a4458;
+  background:radial-gradient(60% 55% at 15% 12%,rgba(178,103,163,.18),transparent 60%),radial-gradient(55% 50% at 85% 88%,rgba(255,153,85,.15),transparent 60%),#fbf7f2}
+ .card{background:#fff;border:1px solid #ece3ea;border-radius:18px;box-shadow:0 18px 50px rgba(74,68,88,.12);padding:34px 32px;width:340px;text-align:center}
+ .emoji{font-size:30px} .brand{font-family:'Script',cursive;font-size:42px;color:#b267a3;line-height:1;margin:4px 0 0}
+ .sub{font-size:12.5px;color:#8a8397;margin-bottom:20px}
+ label{display:block;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8a8397;margin:12px 0 5px}
+ input{width:100%;padding:11px 12px;border:1px solid #e7ddd2;border-radius:10px;font-size:15px;background:#fdfbf9}
+ input:focus{outline:2px solid #d8a9cd;border-color:#d8a9cd}
+ button{margin-top:22px;width:100%;padding:12px;border:0;border-radius:10px;background:#b267a3;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+ button:hover{background:#9d5590} .err{color:#b34b4b;font-size:13px;margin-top:14px;min-height:16px}
+</style></head><body>
+ <form class="card" method="post" action="/login">
+   <div class="emoji">🤰</div><div class="brand">Pregnancy Calendar</div><div class="sub">Studio — please sign in</div>
+   <label>Username</label><input name="user" autocomplete="username" autofocus>
+   <label>Password</label><input name="pass" type="password" autocomplete="current-password">
+   <button type="submit">Sign in</button>
+   <div class="err">${err || ''}</div>
+ </form></body></html>`;
+
 if (AUTH_PASS) {
-  app.use((req, res, next) => {
-    const [type, cred] = (req.headers.authorization || '').split(' ');
-    if (type === 'Basic') {
-      const [u, p] = Buffer.from(cred || '', 'base64').toString().split(':');
-      if (u === AUTH_USER && p === AUTH_PASS) return next();
+  app.get('/login', (req, res) => verifyToken(cookies(req).sid) ? res.redirect('/') : res.type('html').send(loginPage('')));
+  app.post('/login', (req, res) => {
+    const { user, pass } = req.body || {};
+    if (user === AUTH_USER && pass === AUTH_PASS) {
+      res.setHeader('Set-Cookie', `sid=${makeToken(user)}; HttpOnly; Path=/; Max-Age=${7 * 86400}; SameSite=Lax`);
+      return res.redirect('/');
     }
-    res.set('WWW-Authenticate', 'Basic realm="Pregnancy Calendar Studio"').status(401).send('Authentication required');
+    res.status(401).type('html').send(loginPage('Wrong username or password.'));
+  });
+  app.get('/logout', (req, res) => {
+    res.setHeader('Set-Cookie', 'sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
+    res.redirect('/login');
+  });
+  app.use((req, res, next) => {
+    // Static art + fonts are non-sensitive and are fetched as subresources by
+    // the PDF renderer (which can't attach the cookie/token to them).
+    if (req.path.startsWith('/fonts') || req.path.startsWith('/assets')) return next();
+    if (req.query._it && req.query._it === INTERNAL_TOKEN) return next();
+    if (verifyToken(cookies(req).sid)) return next();
+    const apiish = req.path.startsWith('/api') || ['/pdf', '/data', '/plan'].includes(req.path);
+    if (req.method === 'GET' && !apiish) return res.redirect('/login');
+    res.status(401).json({ error: 'Authentication required' });
   });
 }
 
@@ -111,16 +173,13 @@ app.get('/data', (req, res) => {
 // Print-ready PDF (cover + 10 pages). Drives headless Chromium over the preview URL.
 app.get('/pdf', async (req, res) => {
   const { due, lang, name } = params(req);
-  const q = `due=${due}&lang=${lang}&print=1${name ? `&name=${encodeURIComponent(name)}` : ''}`;
+  const q = `due=${due}&lang=${lang}&print=1${name ? `&name=${encodeURIComponent(name)}` : ''}` +
+            (AUTH_PASS ? `&_it=${INTERNAL_TOKEN}` : '');
   const url = `http://localhost:${PORT}/preview?${q}`;
   try {
     const { chromium } = require('playwright');
     const browser = await chromium.launch();
-    // If the gate is on, the internal render request must authenticate too.
-    const context = await browser.newContext(
-      AUTH_PASS ? { httpCredentials: { username: AUTH_USER, password: AUTH_PASS } } : {}
-    );
-    const page = await context.newPage();
+    const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle' });
     await page.evaluate(() => document.fonts.ready);
     const pdf = await page.pdf({ printBackground: true, preferCSSPageSize: true });

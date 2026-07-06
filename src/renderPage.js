@@ -146,11 +146,17 @@ function renderDocument({ dueDate, lang, weeks, pages, forPrint, assetVersion, n
   }).join('\n');
 
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sacramento&family=Quicksand:wght@400;500;600&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root{ --f-script:'Sacramento',cursive; --f-now:'Quicksand',sans-serif; --f-serif:'PT Serif',serif; --f-sans:'Nunito',sans-serif; }
+  /* Self-hosted so fonts render identically every time (no CDN dependency). */
+  @font-face{ font-family:'ScriptGV'; src:url('/fonts/greatvibes.woff2') format('woff2'); font-display:block; }
+  @font-face{ font-family:'ScriptAL'; src:url('/fonts/allura.woff2') format('woff2'); font-display:block; }
+  @font-face{ font-family:'ScriptDA'; src:url('/fonts/dancing-700.woff2') format('woff2'); font-display:block; }
+  @font-face{ font-family:'Geo'; src:url('/fonts/poppins-500.woff2') format('woff2'); font-weight:500; font-display:block; }
+  @font-face{ font-family:'BodySerif'; src:url('/fonts/spectral-400.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:block; }
+  @font-face{ font-family:'BodySerif'; src:url('/fonts/spectral-italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:block; }
+  @font-face{ font-family:'Sans'; src:url('/fonts/nunito-600.woff2') format('woff2'); font-weight:600; font-display:block; }
+  @font-face{ font-family:'Sans'; src:url('/fonts/nunito-700.woff2') format('woff2'); font-weight:700; font-display:block; }
+  :root{ --f-script:'ScriptGV',cursive; --f-now:'Geo',sans-serif; --f-serif:'BodySerif',serif; --f-sans:'Sans',sans-serif; }
   *{ box-sizing:border-box; margin:0; padding:0; }
   html,body{ background:#e9e4dc; }
   .page{ position:relative; width:${PAGE_W}px; height:${PAGE_H}px; background-size:cover; background-repeat:no-repeat; overflow:hidden; }

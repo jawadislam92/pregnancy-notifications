@@ -107,7 +107,7 @@ def build_bases(doc):
                 script = "Brittany" in l["spans"][0]["font"]
                 x0, y0, x1, y1 = [v*SCALE for v in l["bbox"]]
                 fill = median_bg(px, x0, y0, x1, y1)
-                pl, pr, pt, pb = (12, 24, 12, 22) if script else (4, 6, 6, 9)
+                pl, pr, pt, pb = (16, 34, 18, 40) if script else (5, 8, 7, 11)
                 d.rectangle([int(x0-pl), int(y0-pt), int(x1+pr), int(y1+pb)], fill=fill)
         # remove baked Mama-list hearts (we render our own bullets)
         d.rectangle([s(1183), s(360), s(1218), s(632)], fill=base.getpixel((s(1330), s(560))))
