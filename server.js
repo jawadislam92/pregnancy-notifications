@@ -1,5 +1,18 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
+
+// Load .env from the app's own folder (robust regardless of the working dir
+// pm2/systemd launches us from). Existing environment always wins.
+(() => {
+  try {
+    for (const line of fs.readFileSync(path.join(__dirname, '.env'), 'utf8').split('\n')) {
+      const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*?)\s*$/);
+      if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    }
+  } catch { /* no .env — fine */ }
+})();
+
 const { buildPages } = require('./src/dateEngine');
 const { renderDocument, PAGE_W, PAGE_H } = require('./src/renderPage');
 const { MONTHS } = require('./src/layout');
