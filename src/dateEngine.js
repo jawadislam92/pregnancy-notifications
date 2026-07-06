@@ -48,15 +48,14 @@ function buildPages(dueDateStr) {
     const { y, m } = ymd(milestoneDate);
     const grid = monthGrid(y, m);
 
-    // Highlighted gestational week: the WEEK_SPAN_DAYS ending on the milestone date.
-    const hlEnd = milestoneDate;
-    const hlStart = addDays(hlEnd, -(WEEK_SPAN_DAYS - 1));
-
-    // Which day-numbers of THIS month are highlighted, and where the markers go.
+    // Highlight the whole CALENDAR WEEK (one Mon–Sun grid row) that the milestone
+    // falls in. This keeps the highlight a single, contiguous band every time,
+    // instead of a 7-day span that wraps across two rows or gets cut at a month
+    // boundary (which read as an inconsistent 3–4 day highlight).
+    const weekMonday = addDays(milestoneDate, -mondayIndex(milestoneDate));
     const highlightDays = [];
-    for (let i = 0; i < WEEK_SPAN_DAYS; i++) {
-      const day = addDays(hlStart, i);
-      const p = ymd(day);
+    for (let i = 0; i < 7; i++) {
+      const p = ymd(addDays(weekMonday, i));
       if (p.y === y && p.m === m) highlightDays.push(p.d);
     }
     const markerStart = highlightDays.length ? highlightDays[0] : null;
