@@ -30,7 +30,9 @@ function roleDiv(role, content, theme) {
 function renderCalendar(page, theme, ver) {
   const parts = [];
   // Grid lines (subtle, matching the original)
-  const gridBottom = CAL.rowTop + page.rows * CAL.rowH;
+  // Compress rows to fit the fixed band so a 6-row month never overlaps the callout.
+  const rowH = Math.min(CAL.rowH, (CAL.gridBottom - CAL.rowTop) / page.rows);
+  const gridBottom = CAL.rowTop + page.rows * rowH;
   const right = CAL.left + 7 * CAL.colW;
   const LINE = 'rgba(120,100,80,.16)';
   parts.push(`<div style="position:absolute;left:${CAL.left}px;top:${CAL.top}px;width:${right - CAL.left}px;height:${gridBottom - CAL.top}px;border:1.5px solid ${LINE};border-radius:16px"></div>`);
@@ -39,8 +41,8 @@ function renderCalendar(page, theme, ver) {
     parts.push(`<div style="position:absolute;left:${x}px;top:${CAL.top}px;width:1px;height:${gridBottom - CAL.top}px;background:${LINE}"></div>`);
   }
   for (let r = 0; r <= page.rows; r++) {
-    const y = r === 0 ? CAL.rowTop : CAL.rowTop + r * CAL.rowH;
-    if (y >= gridBottom) break;
+    const y = r === 0 ? CAL.rowTop : CAL.rowTop + r * rowH;
+    if (y > gridBottom + 0.5) break;
     parts.push(`<div style="position:absolute;left:${CAL.left}px;top:${y}px;width:${right - CAL.left}px;height:1px;background:${LINE}"></div>`);
   }
   // Weekday header
@@ -53,11 +55,11 @@ function renderCalendar(page, theme, ver) {
     weekRow.forEach((day, c) => {
       if (!day) return;
       const cx = CAL.left + c * CAL.colW;
-      const cy = CAL.rowTop + r * CAL.rowH;
+      const cy = CAL.rowTop + r * rowH;
       const isHl = hl.has(day);
       if (isHl) {
         // highlight cell tint
-        parts.push(`<div style="position:absolute;left:${cx + 1}px;top:${cy}px;width:${CAL.colW - 2}px;height:${CAL.rowH - 6}px;background:${hexToRgba(theme.accent, 0.32)}"></div>`);
+        parts.push(`<div style="position:absolute;left:${cx + 1}px;top:${cy}px;width:${CAL.colW - 2}px;height:${rowH - 4}px;background:${hexToRgba(theme.accent, 0.32)}"></div>`);
       }
       const col = isHl ? theme.primary : NEUTRAL;
       const wt = isHl ? 700 : 700;
@@ -120,15 +122,17 @@ function renderCover(name, lang, pages, ver) {
   const start = `${MONTHS[lang][pages[0].month]} ${pages[0].year}`;
   const end = `${MONTHS[lang][pages[9].month]} ${pages[9].year}`;
   const primary = '#b267a3', grey = NEUTRAL;
+  // Shrink the name for long entries so it never runs off the page.
+  const nameSize = Math.max(46, Math.min(120, Math.floor(1340 / Math.max(9, name.length * 0.52))));
   const bg = `radial-gradient(60% 52% at 13% 10%, rgba(178,103,163,.20), transparent 60%),`
            + `radial-gradient(58% 48% at 87% 90%, rgba(255,153,85,.17), transparent 60%),`
            + `radial-gradient(40% 40% at 92% 12%, rgba(66,130,170,.10), transparent 60%), #fbf7f2`;
   return `<section class="page cover" style="background:${bg}">
     <img src="/assets/deco/flower.png?v=${ver}" style="position:absolute;left:120px;top:150px;width:64px;opacity:.9;transform:rotate(-12deg)">
     <img src="/assets/deco/flower.png?v=${ver}" style="position:absolute;right:150px;bottom:170px;width:52px;opacity:.85;transform:rotate(18deg)">
-    <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 60px">
       <div style="font-family:var(--f-serif);font-size:20px;letter-spacing:.32em;text-transform:uppercase;color:${grey}">${esc(t.for)}</div>
-      <div style="font-family:var(--f-script);font-size:120px;line-height:1.05;color:${primary};margin:6px 0 2px">${esc(name)}</div>
+      <div style="font-family:var(--f-script);font-size:${nameSize}px;line-height:1.05;color:${primary};margin:6px 0 2px;max-width:100%;white-space:nowrap">${esc(name)}</div>
       <div style="font-family:var(--f-serif);font-size:30px;letter-spacing:.06em;color:${grey}">${esc(t.sub)}</div>
       <div style="width:120px;height:2px;background:${primary};opacity:.55;margin:26px 0"></div>
       <div style="font-family:var(--f-now);font-size:19px;letter-spacing:.05em;color:${grey}">${esc(t.weeks)} · ${start} – ${end}</div>

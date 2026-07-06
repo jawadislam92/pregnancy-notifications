@@ -52,6 +52,7 @@ const MAMA = { x: 1220, markerX: 1194, y: 372, w: 168, size: 12.5, lh: 1.3, gap:
 // Calendar geometry (design space)
 const CAL = {
   left: 366, top: 110, colW: 108.7, headerH: 46, rowTop: 158, rowH: 90,
+  gridBottom: 664, // rows compress to fit within [rowTop, gridBottom] so a 6-row month never hits the callout
   numDx: 15, numDy: 8, numSize: 22, hdrSize: 17, hdrDy: 12
 };
 
