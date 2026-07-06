@@ -3,95 +3,126 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pregnancy Calendar Generator</title>
+<title>Pregnancy Calendar Studio</title>
 <style>
-  :root{ --pink:#b267a3; --cream:#fbf7f2; --ink:#4a4458; --line:#e7ddd2; }
+  :root{ --pink:#b267a3; --cream:#fbf7f2; --ink:#4a4458; --muted:#8a8397; --line:#e7ddd2; }
   *{ box-sizing:border-box; }
   body{ margin:0; font-family:'Segoe UI',system-ui,sans-serif; color:var(--ink); background:#efe9e1; }
-  header{ background:var(--cream); border-bottom:1px solid var(--line); padding:16px 26px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-  header h1{ font-size:19px; margin:0; font-weight:700; }
-  header .tag{ font-size:12.5px; color:#8a8397; }
-  .bar{ display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-left:auto; }
-  .field{ display:flex; flex-direction:column; gap:4px; }
-  .field label{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#8a8397; }
-  input[type=date]{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:#fff; }
-  .seg{ display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff; }
-  .seg button{ border:0; background:#fff; padding:8px 14px; font-size:14px; cursor:pointer; color:#8a8397; }
-  .seg button.on{ background:var(--pink); color:#fff; }
-  .btn{ border:0; border-radius:8px; padding:9px 16px; font-size:14px; font-weight:600; cursor:pointer; }
+  header{ background:var(--cream); border-bottom:1px solid var(--line); padding:16px 26px; }
+  header h1{ font-size:20px; margin:0; }
+  header p{ margin:3px 0 0; font-size:13px; color:var(--muted); }
+  .wrap{ max-width:1100px; margin:0 auto; padding:22px 26px 60px; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:22px; box-shadow:0 4px 16px rgba(0,0,0,.05); }
+  .card h2{ font-size:14px; margin:0 0 14px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  form.add{ display:grid; grid-template-columns:1.4fr 1fr .8fr 1.3fr 1fr auto; gap:12px; align-items:end; }
+  .field{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .field label{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  input, select{ padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:#fff; width:100%; }
+  .btn{ border:0; border-radius:8px; padding:9px 16px; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
   .btn.primary{ background:var(--pink); color:#fff; }
   .btn.ghost{ background:#fff; border:1px solid var(--line); color:var(--ink); }
-  .btn:disabled{ opacity:.55; cursor:default; }
-  main{ padding:0; }
-  iframe{ width:100%; height:calc(100vh - 132px); border:0; background:#efe9e1; display:block; }
-  .note{ font-size:12px; color:#8a8397; }
-  .plan{ display:flex; gap:8px; overflow-x:auto; padding:8px 16px; background:#f6f1ea; border-bottom:1px solid var(--line); }
-  .chip{ flex:0 0 auto; display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:9px; padding:6px 10px; font-size:12px; white-space:nowrap; }
-  .chip b{ color:var(--pink); }
-  .chip .pg{ background:var(--pink); color:#fff; border-radius:5px; padding:1px 6px; font-size:11px; font-weight:700; }
-  .chip .mo{ color:#8a8397; }
+  .btn.sm{ padding:6px 10px; font-size:12.5px; }
+  .btn.link{ background:none; border:0; color:var(--pink); font-weight:600; cursor:pointer; padding:6px 8px; font-size:12.5px; }
+  .btn.link.danger{ color:#b34b4b; }
+  table{ width:100%; border-collapse:collapse; }
+  th, td{ padding:11px 12px; border-bottom:1px solid var(--line); font-size:13.5px; text-align:left; vertical-align:middle; }
+  th{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  td .nm{ font-weight:600; }
+  td .sub{ color:var(--muted); font-size:12px; }
+  .pill{ display:inline-block; background:#f3e8f0; color:var(--pink); border-radius:20px; padding:2px 9px; font-size:11.5px; font-weight:600; }
+  .actions{ display:flex; gap:2px; flex-wrap:wrap; justify-content:flex-end; }
+  .empty{ text-align:center; color:var(--muted); padding:40px 0; }
+  .err{ color:#b34b4b; font-size:13px; margin-top:8px; min-height:16px; }
 </style>
 </head>
 <body>
 <header>
-  <div>
-    <h1>🤰 Pregnancy Calendar Generator</h1>
-    <div class="tag">One due date in → a personalized 10-page calendar out</div>
-  </div>
-  <div class="bar">
-    <div class="field">
-      <label for="due">Due date</label>
-      <input type="date" id="due" value="2026-10-15">
-    </div>
-    <div class="field">
-      <label>Language</label>
-      <div class="seg" id="lang">
-        <button data-l="en" class="on">English</button>
-        <button data-l="de">Deutsch</button>
-      </div>
-    </div>
-    <button class="btn primary" id="update">Update preview</button>
-    <button class="btn ghost" id="pdf">⬇ Download PDF</button>
-  </div>
+  <h1>🤰 Pregnancy Calendar Studio</h1>
+  <p>Add a customer’s details once — generate their personalized 10-page calendar, PDF, or data table.</p>
 </header>
-<div class="plan" id="plan"></div>
-<main>
-  <iframe id="frame" src="/preview?due=2026-10-15&lang=en"></iframe>
-</main>
+<div class="wrap">
+
+  <div class="card">
+    <h2>Add customer</h2>
+    <form class="add" id="addForm" autocomplete="off">
+      <div class="field"><label>Name *</label><input name="name" required placeholder="e.g. Emma Schmidt"></div>
+      <div class="field"><label>Due date *</label><input name="due_date" type="date" required></div>
+      <div class="field"><label>Language</label>
+        <select name="lang"><option value="en">English</option><option value="de">Deutsch</option></select>
+      </div>
+      <div class="field"><label>Email</label><input name="email" type="email" placeholder="optional"></div>
+      <div class="field"><label>Order / ref</label><input name="order_ref" placeholder="optional"></div>
+      <button class="btn primary" type="submit">Add</button>
+    </form>
+    <div class="field" style="margin-top:12px"><label>Notes</label><input id="notes" name="notes" placeholder="optional notes"></div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="card">
+    <h2>Customers</h2>
+    <div id="tableWrap"></div>
+  </div>
+</div>
+
 <script>
-  let lang = 'en';
-  const frame = document.getElementById('frame');
-  const due = document.getElementById('due');
-  function url(base){ return base + '?due=' + encodeURIComponent(due.value) + '&lang=' + lang; }
-  function refresh(){
-    // Always force a fresh load (nonce) so Update never looks like a no-op.
-    frame.src = url('/preview') + '&_=' + Date.now();
-    loadPlan();
+  const $ = (s, r=document) => r.querySelector(s);
+  const esc = (s) => (s==null?'':String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const q = (c) => 'due=' + encodeURIComponent(c.due_date) + '&lang=' + c.lang + '&name=' + encodeURIComponent(c.name);
+
+  // Current gestational week from due date (due date = end of week 40)
+  function weekNow(due){
+    const d = new Date(due + 'T00:00:00'); const today = new Date(); today.setHours(0,0,0,0);
+    const daysToDue = Math.round((d - today) / 86400000);
+    const wk = 40 - daysToDue / 7;
+    if (wk < 1) return '<span class="sub">not started</span>';
+    if (wk > 41) return '<span class="sub">due passed</span>';
+    return '<span class="pill">Week ' + Math.round(wk) + '</span>';
   }
-  async function loadPlan(){
-    try{
-      const rows = await (await fetch(url('/plan') + '&_=' + Date.now())).json();
-      document.getElementById('plan').innerHTML = rows.map(r =>
-        '<div class="chip"><span class="pg">' + r.page + '</span> <b>Week ' + r.week +
-        '</b> <span class="mo">' + r.month + ' ' + r.year + '</span> · ' + r.fruit + '</div>'
-      ).join('');
-    }catch(e){ /* ignore */ }
+  const fmt = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(); };
+
+  async function load(){
+    const list = await (await fetch('/api/customers')).json();
+    const wrap = $('#tableWrap');
+    if (!list.length){ wrap.innerHTML = '<div class="empty">No customers yet — add one above to generate their calendar.</div>'; return; }
+    wrap.innerHTML = '<table><thead><tr>' +
+      '<th>Name</th><th>Due date</th><th>Language</th><th>Now</th><th>Added</th><th style="text-align:right">Actions</th>' +
+      '</tr></thead><tbody>' + list.map(c => {
+        const url = q(c);
+        return '<tr>' +
+          '<td><div class="nm">' + esc(c.name) + '</div>' + (c.email? '<div class="sub">' + esc(c.email) + '</div>':'') +
+             (c.order_ref? '<div class="sub">#' + esc(c.order_ref) + '</div>':'') + '</td>' +
+          '<td>' + esc(c.due_date) + '</td>' +
+          '<td>' + (c.lang==='de'?'Deutsch':'English') + '</td>' +
+          '<td>' + weekNow(c.due_date) + '</td>' +
+          '<td class="sub">' + fmt(c.created_at) + '</td>' +
+          '<td><div class="actions">' +
+            '<a class="btn link" target="_blank" href="/preview?' + url + '">👁 View</a>' +
+            '<a class="btn link" href="/pdf?' + url + '">⬇ PDF</a>' +
+            '<a class="btn link" target="_blank" href="/data?' + url + '">📋 Data</a>' +
+            '<button class="btn link danger" data-del="' + c.id + '">✕</button>' +
+          '</div></td>' +
+        '</tr>';
+      }).join('') + '</tbody></table>';
+    wrap.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+      if (!confirm('Delete this customer?')) return;
+      await fetch('/api/customers/' + b.dataset.del, { method:'DELETE' });
+      load();
+    });
   }
-  document.getElementById('update').onclick = refresh;
-  due.onchange = refresh;
-  document.querySelectorAll('#lang button').forEach(b => b.onclick = () => {
-    lang = b.dataset.l;
-    document.querySelectorAll('#lang button').forEach(x => x.classList.toggle('on', x === b));
-    refresh();
-  });
-  loadPlan();
-  document.getElementById('pdf').onclick = () => {
-    const btn = document.getElementById('pdf');
-    btn.disabled = true; btn.textContent = 'Generating…';
-    const a = document.createElement('a'); a.href = url('/pdf');
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => { btn.disabled = false; btn.textContent = '⬇ Download PDF'; }, 3500);
+
+  $('#addForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const body = {
+      name: f.name.value, due_date: f.due_date.value, lang: f.lang.value,
+      email: f.email.value, order_ref: f.order_ref.value, notes: $('#notes').value
+    };
+    const res = await fetch('/api/customers', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (!res.ok){ $('#err').textContent = (await res.json()).error || 'Could not add customer'; return; }
+    $('#err').textContent = ''; f.reset(); $('#notes').value = ''; load();
   };
+
+  load();
 </script>
 </body>
 </html>

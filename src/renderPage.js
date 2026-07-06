@@ -113,9 +113,33 @@ function renderPage(pageDesc, week, theme, lang, ver) {
   return `<section class="page" data-week="${week.week}" style="background-image:url('${bg}')">${parts.join('\n')}</section>`;
 }
 
-function renderDocument({ dueDate, lang, weeks, pages, forPrint, assetVersion }) {
+function renderCover(name, lang, pages, ver) {
+  const t = lang === 'de'
+    ? { for: 'Ein Schwangerschaftskalender für', sub: 'Schwangerschaftsreise', weeks: 'Woche 4–40' }
+    : { for: 'A pregnancy calendar for', sub: 'Pregnancy Journey', weeks: 'Weeks 4–40' };
+  const start = `${MONTHS[lang][pages[0].month]} ${pages[0].year}`;
+  const end = `${MONTHS[lang][pages[9].month]} ${pages[9].year}`;
+  const primary = '#b267a3', grey = NEUTRAL;
+  const bg = `radial-gradient(60% 52% at 13% 10%, rgba(178,103,163,.20), transparent 60%),`
+           + `radial-gradient(58% 48% at 87% 90%, rgba(255,153,85,.17), transparent 60%),`
+           + `radial-gradient(40% 40% at 92% 12%, rgba(66,130,170,.10), transparent 60%), #fbf7f2`;
+  return `<section class="page cover" style="background:${bg}">
+    <img src="/assets/deco/flower.png?v=${ver}" style="position:absolute;left:120px;top:150px;width:64px;opacity:.9;transform:rotate(-12deg)">
+    <img src="/assets/deco/flower.png?v=${ver}" style="position:absolute;right:150px;bottom:170px;width:52px;opacity:.85;transform:rotate(18deg)">
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+      <div style="font-family:var(--f-serif);font-size:20px;letter-spacing:.32em;text-transform:uppercase;color:${grey}">${esc(t.for)}</div>
+      <div style="font-family:var(--f-script);font-size:120px;line-height:1.05;color:${primary};margin:6px 0 2px">${esc(name)}</div>
+      <div style="font-family:var(--f-serif);font-size:30px;letter-spacing:.06em;color:${grey}">${esc(t.sub)}</div>
+      <div style="width:120px;height:2px;background:${primary};opacity:.55;margin:26px 0"></div>
+      <div style="font-family:var(--f-now);font-size:19px;letter-spacing:.05em;color:${grey}">${esc(t.weeks)} · ${start} – ${end}</div>
+    </div>
+  </section>`;
+}
+
+function renderDocument({ dueDate, lang, weeks, pages, forPrint, assetVersion, name }) {
   const ver = assetVersion || '1';
-  const body = pages.map((p, i) => {
+  const cover = name && name.trim() ? renderCover(name.trim(), lang, pages, ver) : '';
+  const body = cover + pages.map((p, i) => {
     const week = weeks[i];
     const theme = { primary: week.primary, accent: week.accent, grey: NEUTRAL };
     return renderPage(p, week, theme, lang, ver);

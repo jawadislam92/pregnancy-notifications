@@ -1,11 +1,14 @@
-# Pregnancy Calendar Generator
+# Pregnancy Calendar Studio
 
-Turns **one due date** into a personalized **10-page pregnancy wall calendar** that
-matches the approved Canva design — rendered in the browser and exported as a
-print-ready PDF. English 🇬🇧 / German 🇩🇪.
+Turns **one due date** into a personalized **pregnancy wall calendar** (a cover page
++ 10 months) that matches the approved Canva design — rendered in the browser and
+exported as a print-ready PDF. English 🇬🇧 / German 🇩🇪.
 
-This is the local demo build (Route 1: full code, no Canva at runtime). It runs
-entirely on your PC.
+Manage customers in a simple table: add their details once, then **View calendar**,
+**Download PDF**, or **View data** per customer.
+
+Route 1 (full code, no Canva at runtime). Runs entirely on your PC; ready to deploy
+to a small VPS (see below).
 
 ---
 
@@ -48,9 +51,22 @@ weekday error in the hand-made sample.)
 | Date engine | `src/dateEngine.js` | due date → 10 months, grids, highlight ranges. Pure, unit-tested. |
 | Content | `src/weeks.js` | per-week bilingual copy, fruit, size/weight, colours. **Edit here.** |
 | Layout / i18n | `src/layout.js` | exact text positions (from the design), month & weekday names. |
-| Renderer | `src/renderPage.js` | composes the 10 pages: art background + overlaid text + calendar. |
-| Server | `server.js` | `/preview` (live HTML) and `/pdf` (Playwright → PDF). |
-| UI | `public/index.html` | due-date form, language toggle, preview, download. |
+| Renderer | `src/renderPage.js` | composes the cover + 10 pages: art background + overlaid text + calendar. |
+| Storage | `src/db.js` | customer records in SQLite (`node:sqlite`, no native build). |
+| Server | `server.js` | `/preview`, `/pdf`, `/data`, `/plan`, `/api/customers` (CRUD). |
+| UI | `public/index.html` | the Studio: add-customer form + customer table with per-row actions. |
+
+### The Studio (customer flow)
+
+The home page is a customer table. Add a customer (name, due date, language, email,
+order ref, notes) and each row gives you:
+
+- **👁 View** — the calendar in the browser (`/preview?due=…&lang=…&name=…`)
+- **⬇ PDF** — the print-ready file (cover + 10 months)
+- **📋 Data** — a spreadsheet-style table of the 10 weeks (`/data`)
+
+Customers persist in `data/customers.db` (created automatically; not committed).
+Passing `&name=` adds a personalized cover page (“A pregnancy calendar for …”).
 
 ### The artwork
 
@@ -84,16 +100,35 @@ pregnancies, month grids, and highlight ranges.
 
 ---
 
-## Demo scope & next steps
+## Deploy to a VPS
 
-**In this build:** single due date → preview + print-ready PDF, EN/DE, pixel-faithful.
+A small Ubuntu box (~$6–12/mo) is enough. Rough steps:
 
-**Ready to add (clean seams already in place):**
-- **Bulk** — feed a customer list (name + due date + language) and generate all
-  calendars in one run; the engine + renderer are already list-friendly.
-- **Shopify** — order webhook → generate PDF → email/deliver.
-- **Hosting** — currently local; a small always-on box (≈ $6–12/mo, headless
-  Chromium) is the natural home for production.
+```bash
+# 1. Node 22 + build essentials
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs
+# 2. app + deps + the Chromium the PDF step needs (with system libs)
+git clone <repo> && cd pregnancy-notifications && npm ci
+npx playwright install --with-deps chromium
+# 3. keep it running
+sudo npm i -g pm2 && pm2 start server.js --name calendar && pm2 save
+# 4. Nginx reverse proxy on your domain + free SSL (certbot) -> proxy_pass http://127.0.0.1:4010
+```
+
+Storage is just the `data/customers.db` file on the same box — no extra services.
+
+## Roadmap (next)
+
+- **Bulk import** — paste/upload a CSV of customers → generate all at once.
+- **Shopify** — order webhook → auto-create customer → email the PDF.
+- **Auth** — a simple login before deploying publicly.
+
+## Demo notes
+
+- Free substitute fonts stand in for the commercial *Brittany Signature* + *Now*
+  (swap the CSS vars in `src/renderPage.js` when licensed files arrive).
+- "Mama may notice" bullets were authored to match the design; edit in `src/weeks.js`.
+- Highlighted-week span is one config value (`WEEK_SPAN_DAYS` in `src/dateEngine.js`).
 
 **Notes / to confirm with the client:**
 - Fonts use close free substitutes (Sacramento / Quicksand / PT Serif / Nunito)
