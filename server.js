@@ -13,6 +13,22 @@ const PORT = process.env.PORT || 4010;
 const ASSET_VERSION = String(Date.now());
 
 app.use(express.json());
+
+// Optional password gate (HTTP Basic). Off unless STUDIO_PASSWORD is set —
+// strongly recommended when the app is reachable from the internet.
+const AUTH_USER = process.env.STUDIO_USER || 'admin';
+const AUTH_PASS = process.env.STUDIO_PASSWORD || '';
+if (AUTH_PASS) {
+  app.use((req, res, next) => {
+    const [type, cred] = (req.headers.authorization || '').split(' ');
+    if (type === 'Basic') {
+      const [u, p] = Buffer.from(cred || '', 'base64').toString().split(':');
+      if (u === AUTH_USER && p === AUTH_PASS) return next();
+    }
+    res.set('WWW-Authenticate', 'Basic realm="Pregnancy Calendar Studio"').status(401).send('Authentication required');
+  });
+}
+
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -87,7 +103,11 @@ app.get('/pdf', async (req, res) => {
   try {
     const { chromium } = require('playwright');
     const browser = await chromium.launch();
-    const page = await browser.newPage();
+    // If the gate is on, the internal render request must authenticate too.
+    const context = await browser.newContext(
+      AUTH_PASS ? { httpCredentials: { username: AUTH_USER, password: AUTH_PASS } } : {}
+    );
+    const page = await context.newPage();
     await page.goto(url, { waitUntil: 'networkidle' });
     await page.evaluate(() => document.fonts.ready);
     const pdf = await page.pdf({ printBackground: true, preferCSSPageSize: true });
@@ -118,4 +138,5 @@ app.delete('/api/customers/:id', (req, res) => {
   res.status(204).end();
 });
 
-app.listen(PORT, () => console.log(`Pregnancy Calendar Studio → http://localhost:${PORT}`));
+app.listen(PORT, '0.0.0.0', () =>
+  console.log(`Pregnancy Calendar Studio → http://localhost:${PORT}${AUTH_PASS ? ' (password protected)' : ''}`));
