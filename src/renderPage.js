@@ -9,10 +9,29 @@ const PAGE_W = 1440, PAGE_H = 810;
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
-function hexToRgba(hex, a) {
+function hexToRgb(hex) {
   const h = hex.replace('#', '');
   const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function hexToRgba(hex, a) { const [r, g, b] = hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; }
+// A dark, readable, saturated version of a colour — used so highlighted dates
+// share the highlight band's hue on every page (consistent + always legible).
+function deepThemed(hex) {
+  let [r, g, b] = hexToRgb(hex).map(v => v / 255);
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  let h = 0, s = 0; const l = (mx + mn) / 2;
+  if (mx !== mn) {
+    const d = mx - mn;
+    s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h /= 6;
+  }
+  const S = Math.max(s, 0.45), L = 0.36; // force it dark + saturated
+  const k = n => (n + h * 12) % 12, a = S * Math.min(L, 1 - L);
+  const f = n => L - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  const to = x => Math.round(x * 255).toString(16).padStart(2, '0');
+  return '#' + to(f(0)) + to(f(8)) + to(f(4));
 }
 function colorFor(role, theme) { return role.color === 'primary' ? theme.primary : theme.grey; }
 
@@ -61,9 +80,8 @@ function renderCalendar(page, theme, ver) {
         // highlight cell tint
         parts.push(`<div style="position:absolute;left:${cx + 1}px;top:${cy}px;width:${CAL.colW - 2}px;height:${rowH - 4}px;background:${hexToRgba(theme.accent, 0.32)}"></div>`);
       }
-      const col = isHl ? theme.primary : NEUTRAL;
-      const wt = isHl ? 700 : 700;
-      parts.push(`<div style="position:absolute;left:${cx + CAL.numDx}px;top:${cy + CAL.numDy}px;font-family:var(--f-sans);font-weight:${wt};font-size:${CAL.numSize}px;color:${col}">${String(day).padStart(2, '0')}</div>`);
+      const col = isHl ? deepThemed(theme.accent) : NEUTRAL;
+      parts.push(`<div style="position:absolute;left:${cx + CAL.numDx}px;top:${cy + CAL.numDy}px;font-family:var(--f-sans);font-weight:700;font-size:${CAL.numSize}px;color:${col}">${String(day).padStart(2, '0')}</div>`);
       // flower markers on first & last highlighted day
       if (day === page.markerStart || day === page.markerEnd) {
         parts.push(`<img src="/assets/deco/flower.png?v=${ver}" style="position:absolute;left:${cx + CAL.colW - 40}px;top:${cy + 2}px;width:30px;height:30px;object-fit:contain">`);
