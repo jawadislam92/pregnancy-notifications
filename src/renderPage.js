@@ -49,9 +49,11 @@ function roleDiv(role, content, theme) {
 function renderCalendar(page, theme, ver) {
   const parts = [];
   // Grid lines (subtle, matching the original)
-  // Compress rows to fit the fixed band so a 6-row month never overlaps the callout.
-  const rowH = Math.min(CAL.rowH, (CAL.gridBottom - CAL.rowTop) / page.rows);
-  const gridBottom = CAL.rowTop + page.rows * rowH;
+  // The grid ALWAYS fills the same fixed box [rowTop, gridBottom]; rows stretch or
+  // compress to fit. So the calendar's bottom edge — and the gap to the callout
+  // below it — is identical on every page (4-, 5- or 6-row months), matching Canva.
+  const rowH = (CAL.gridBottom - CAL.rowTop) / page.rows;
+  const gridBottom = CAL.gridBottom;
   const right = CAL.left + 7 * CAL.colW;
   const LINE = 'rgba(120,100,80,.16)';
   parts.push(`<div style="position:absolute;left:${CAL.left}px;top:${CAL.top}px;width:${right - CAL.left}px;height:${gridBottom - CAL.top}px;border:1.5px solid ${LINE};border-radius:16px"></div>`);
