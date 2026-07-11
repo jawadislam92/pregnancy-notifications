@@ -30,8 +30,18 @@
   td .nm{ font-weight:600; }
   td .sub{ color:var(--muted); font-size:12px; }
   .pill{ display:inline-block; background:#f3e8f0; color:var(--pink); border-radius:20px; padding:2px 9px; font-size:11.5px; font-weight:600; }
-  .actions{ display:flex; gap:2px; flex-wrap:wrap; justify-content:flex-end; }
-  .empty{ text-align:center; color:var(--muted); padding:40px 0; }
+  .actions{ display:flex; gap:1px; flex-wrap:wrap; justify-content:flex-end; }
+  .btn.link{ border-radius:7px; transition:background .12s; }
+  .btn.link:hover{ background:#f6eef4; }
+  .btn.link.danger:hover{ background:#faecec; }
+  tbody tr{ transition:background .12s; }
+  tbody tr:hover td{ background:#fbf7fb; }
+  th.r, td.r{ text-align:right; }
+  .badge{ display:inline-block; border-radius:20px; padding:1px 8px; font-size:10.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; vertical-align:middle; margin-left:6px; }
+  .badge.form{ background:#e8f1ea; color:#5f8f6e; }
+  .count{ font-size:12px; font-weight:400; color:var(--muted); text-transform:none; letter-spacing:0; }
+  .empty{ text-align:center; color:var(--muted); padding:44px 0; }
+  .empty b{ color:var(--ink); display:block; margin-bottom:4px; font-size:15px; }
   .err{ color:#b34b4b; font-size:13px; margin-top:8px; min-height:16px; }
 </style>
 </head>
@@ -66,7 +76,7 @@
   </div>
 
   <div class="card">
-    <h2>Customers</h2>
+    <h2>Customers <span class="count" id="count"></span></h2>
     <div id="tableWrap"></div>
   </div>
 </div>
@@ -90,22 +100,25 @@
   async function load(){
     const list = await (await fetch('/api/customers')).json();
     const wrap = $('#tableWrap');
-    if (!list.length){ wrap.innerHTML = '<div class="empty">No customers yet — add one above to generate their calendar.</div>'; return; }
+    $('#count').textContent = list.length ? '· ' + list.length : '';
+    if (!list.length){ wrap.innerHTML = '<div class="empty"><b>No customers yet</b>Add one above, or share the public form to collect them.</div>'; return; }
     wrap.innerHTML = '<table><thead><tr>' +
-      '<th>Name</th><th>Due date</th><th>Language</th><th>Now</th><th>Added</th><th style="text-align:right">Actions</th>' +
+      '<th>Name</th><th>Due date</th><th>Language</th><th>Now</th><th>Added</th><th class="r">Actions</th>' +
       '</tr></thead><tbody>' + list.map(c => {
         const url = q(c);
+        const source = c.source==='form' ? '<span class="badge form">form</span>' : '';
         return '<tr>' +
-          '<td><div class="nm">' + esc(c.name) + '</div>' + (c.email? '<div class="sub">' + esc(c.email) + '</div>':'') +
+          '<td><div class="nm">' + esc(c.name) + source + '</div>' + (c.email? '<div class="sub">' + esc(c.email) + '</div>':'') +
              (c.order_ref? '<div class="sub">#' + esc(c.order_ref) + '</div>':'') + '</td>' +
           '<td>' + esc(c.due_date) + '</td>' +
           '<td>' + (c.lang==='de'?'Deutsch':'English') + '</td>' +
           '<td>' + weekNow(c.due_date) + '</td>' +
           '<td class="sub">' + fmt(c.created_at) + '</td>' +
-          '<td><div class="actions">' +
+          '<td class="r"><div class="actions">' +
             '<a class="btn link" target="_blank" href="/preview?' + url + '">👁 View</a>' +
             '<a class="btn link" href="/pdf?' + url + '">⬇ PDF</a>' +
             '<a class="btn link" target="_blank" href="/data?' + url + '">📋 Data</a>' +
+            (c.token ? '<button class="btn link" data-link="' + c.token + '">🔗 Link</button>' : '') +
             '<button class="btn link danger" data-del="' + c.id + '">✕</button>' +
           '</div></td>' +
         '</tr>';
@@ -114,6 +127,10 @@
       if (!confirm('Delete this customer?')) return;
       await fetch('/api/customers/' + b.dataset.del, { method:'DELETE' });
       load();
+    });
+    wrap.querySelectorAll('[data-link]').forEach(b => b.onclick = () => {
+      navigator.clipboard.writeText(location.origin + '/c/' + b.dataset.link);
+      const t = b.textContent; b.textContent = '✓ Copied'; setTimeout(() => b.textContent = t, 1200);
     });
   }
 
