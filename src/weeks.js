@@ -27,7 +27,7 @@ module.exports = [
   },
   {
     week: 8, fruit: { en: 'Raspberry', de: 'Himbeere' },
-    length: '1.5 cm', weight: '1 g',
+    length: '1.5 cm', weight: '< 1 g',
     primary: '#b267a3', accent: '#ffb27f',
     babyDev: {
       en: 'Your baby is now about the size of a raspberry. Tiny movements are already beginning inside the womb.',
@@ -38,14 +38,14 @@ module.exports = [
       de: ['Größerer Appetit', 'Emotionale Höhen und Tiefen', 'Gelegentliche Übelkeit']
     },
     callout: {
-      label: { en: 'Little moment', de: 'Kleiner Moment' },
-      text: { en: 'This might be the perfect time for your very first bump picture.',
-              de: 'Vielleicht ist jetzt der perfekte Zeitpunkt für dein erstes Bauchfoto.' }
+      label: { en: 'Fun fact', de: 'Fun Fact' },
+      text: { en: 'Even though you can’t feel them yet, your baby is already moving around.',
+              de: 'Auch wenn du sie noch nicht spürst — dein Baby bewegt sich schon fleißig.' }
     }
   },
   {
     week: 12, fruit: { en: 'Lemon', de: 'Zitrone' },
-    length: '5–6 cm', weight: '14 g',
+    length: '5–6 cm', weight: '< 14 g',
     primary: '#4282aa', accent: '#9ecbe0',
     babyDev: {
       en: 'Your baby is now about the size of a lemon. Tiny reflexes continue developing every day.',
@@ -56,9 +56,13 @@ module.exports = [
       de: ['Die Übelkeit lässt oft nach', 'Etwas mehr Energie', 'Der Appetit kommt zurück']
     },
     callout: {
-      label: { en: 'Special moment', de: 'Besonderer Moment' },
-      text: { en: 'Have you already shared the exciting news with your loved ones?',
-              de: 'Hast du die frohe Botschaft schon mit deinen Liebsten geteilt?' }
+      label: { en: 'Mini riddle', de: 'Mini-Rätsel' },
+      text: { en: 'What is your baby already secretly practicing? Answer: Swallowing and sucking.',
+              de: 'Was übt dein Baby heimlich schon? Antwort: Schlucken und Saugen.' }
+    },
+    tip: {
+      en: 'Have you already shared the exciting news with your loved ones?',
+      de: 'Hast du die frohe Botschaft schon mit deinen Liebsten geteilt?'
     }
   },
   {
@@ -74,9 +78,13 @@ module.exports = [
       de: ['Ein rundlicher Bauch', 'Mehr Energie als zuvor', 'Strahlende Haut']
     },
     callout: {
-      label: { en: 'Preparation tip', de: 'Vorbereitungstipp' },
-      text: { en: 'It might be fun to slowly start picking out first baby essentials.',
-              de: 'Vielleicht macht es Spaß, langsam erste Babysachen auszusuchen.' }
+      label: { en: 'Fun fact', de: 'Fun Fact' },
+      text: { en: 'Amniotic fluid is completely renewed every single day.',
+              de: 'Das Fruchtwasser erneuert sich jeden Tag vollständig.' }
+    },
+    tip: {
+      en: 'Preparation Tip: It might be fun to slowly start picking out first baby essentials.',
+      de: 'Vorbereitungstipp: Vielleicht macht es Spaß, langsam erste Babysachen auszusuchen.'
     }
   },
   {
@@ -92,9 +100,13 @@ module.exports = [
       de: ['Der Bauch ist deutlich sichtbar', 'Erste zarte Tritte', 'Emotionale Momente']
     },
     callout: {
-      label: { en: 'Important appointment', de: 'Wichtiger Termin' },
-      text: { en: 'Around this time, many parents have the detailed anatomy scan.',
-              de: 'Rund um diese Woche findet oft der große Organ-Ultraschall statt.' }
+      label: { en: 'Fun fact', de: 'Fun Fact' },
+      text: { en: 'Babies already sleep inside the womb, sometimes even with tiny dream phases.',
+              de: 'Babys schlafen schon im Bauch — manchmal sogar mit kleinen Traumphasen.' }
+    },
+    tip: {
+      en: 'Important Appointment: Around this time, many parents have the detailed anatomy scan.',
+      de: 'Wichtiger Termin: Rund um diese Zeit findet oft der große Organ-Ultraschall statt.'
     }
   },
   {
@@ -128,9 +140,13 @@ module.exports = [
       de: ['Das dritte Trimester beginnt', 'Manchmal kürzerer Atem', 'Häufigere Pausen']
     },
     callout: {
-      label: { en: 'Preparation tip', de: 'Vorbereitungstipp' },
-      text: { en: 'Many hospitals recommend registering for the birth around this time.',
-              de: 'Viele Kliniken empfehlen, sich jetzt zur Geburt anzumelden.' }
+      label: { en: 'Did you know?', de: 'Schon gewusst?' },
+      text: { en: 'Your baby can now blink.',
+              de: 'Dein Baby kann jetzt blinzeln.' }
+    },
+    tip: {
+      en: 'Preparation Tip: Many hospitals recommend registering for the birth around this time.',
+      de: 'Vorbereitungstipp: Viele Kliniken empfehlen, sich jetzt zur Geburt anzumelden.'
     }
   },
   {
@@ -146,9 +162,13 @@ module.exports = [
       de: ['Mehr Druck nach unten', 'Schnellere Erschöpfung', 'Unruhiger Schlaf']
     },
     callout: {
-      label: { en: 'Preparation tip', de: 'Vorbereitungstipp' },
-      text: { en: 'This might be a great time to slowly start packing your hospital bag.',
-              de: 'Jetzt ist ein guter Zeitpunkt, langsam die Kliniktasche zu packen.' }
+      label: { en: 'Did you know?', de: 'Schon gewusst?' },
+      text: { en: 'Your baby is already practicing breathing movements for life after birth.',
+              de: 'Dein Baby übt schon Atembewegungen für das Leben nach der Geburt.' }
+    },
+    tip: {
+      en: 'Preparation Tip: This might be a great time to slowly start packing your hospital bag.',
+      de: 'Vorbereitungstipp: Jetzt ist ein guter Zeitpunkt, langsam die Kliniktasche zu packen.'
     }
   },
   {
@@ -164,9 +184,13 @@ module.exports = [
       de: ['Stärkerer Beckendruck', 'Ziehen im Becken', 'Das Baby rutscht tiefer']
     },
     callout: {
-      label: { en: 'Reminder', de: 'Erinnerung' },
-      text: { en: 'If you haven’t already, now is a great time to install the car seat.',
-              de: 'Falls noch nicht erledigt — jetzt ist ein guter Zeitpunkt für den Autositz.' }
+      label: { en: 'Mini riddle', de: 'Mini-Rätsel' },
+      text: { en: 'Which sense is your baby using especially actively now? Answer: Touch.',
+              de: 'Welchen Sinn nutzt dein Baby jetzt besonders aktiv? Antwort: den Tastsinn.' }
+    },
+    tip: {
+      en: 'Reminder: If you haven’t already, now is a great time to install the car seat.',
+      de: 'Erinnerung: Falls noch nicht erledigt — jetzt ist ein guter Zeitpunkt für den Autositz.'
     }
   },
   {
@@ -182,7 +206,7 @@ module.exports = [
       de: ['Emotionen in Wellen', 'Erste Anzeichen der Geburt', 'Große Vorfreude']
     },
     callout: {
-      label: { en: 'The big moment', de: 'Der große Moment' },
+      label: { en: 'The Big Moment', de: 'Der große Moment' },
       text: { en: 'Your baby could decide to meet you at any moment now.',
               de: 'Dein Baby könnte sich jederzeit auf den Weg machen, um dich kennenzulernen.' }
     }
