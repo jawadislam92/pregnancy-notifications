@@ -17,13 +17,20 @@ Outputs (committed to the repo):
 
 Requires: pymupdf, openpyxl, pillow   (pip install pymupdf openpyxl pillow)
 """
-import fitz, openpyxl, io, os, statistics
+import fitz, openpyxl, io, os, sys, statistics
 from PIL import Image, ImageDraw
 
 PDF  = r"C:\Users\jawad\Downloads\Documents\canva.pdf"
 XLSX = r"C:\Users\jawad\Downloads\Pregnancy Calendar Overview.xlsx"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCALE = 2.0                       # 2x -> crisp 2880x1620 assets
+# --print: rebuild the page backgrounds at true print resolution (300 dpi over
+# the design's 20x11.25in trim = 6000x3375) for the PDF pipeline. The default
+# 2x set stays as the fast web-preview background. Print bases are JPEG (q92,
+# no chroma subsampling): visually lossless on this artwork, ~5x smaller.
+PRINT = "--print" in sys.argv
+SCALE = (300 / 72) if PRINT else 2.0
+PLATES_DIR = "print-plates" if PRINT else "plates"
+BASE_DIR = "print" if PRINT else "base"
 MILESTONES = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40]
 
 def apath(*p):
@@ -77,7 +84,11 @@ def build_plates_and_flower(doc):
                 continue
             canvas.alpha_composite(src.resize((max(1, s(w)), max(1, s(h))), Image.LANCZOS),
                                    (s(x0), s(y0)))
-        canvas.convert("RGB").save(apath("plates", f"week-{week:02d}.png"), quality=95)
+        plate = canvas.convert("RGB")
+        if PRINT:
+            plate.save(apath(PLATES_DIR, f"week-{week:02d}.jpg"), quality=95, subsampling=0)
+        else:
+            plate.save(apath(PLATES_DIR, f"week-{week:02d}.png"), quality=95)
     print("plates + flower + bullet hearts: done")
 
 def erase_interp(base, x0, y0, x1, y1, mask=None, ring=(4, 18), force_horiz=False):
@@ -266,7 +277,8 @@ def save_keyed_sprite(pg, pristine, week, zone, name, max_side=95):
             px[x, y] = (r, g, b, 0 if d < 12 else min(255, (d - 12) * 14))
     crop.save(apath("deco", f"{name}-{week:02d}.png"))
 
-def paste_feathered(base, plate, box, feather=14):
+def paste_feathered(base, plate, box, feather=None):
+    if feather is None: feather = max(8, int(7 * SCALE))
     """Paste a plate region with soft edges so the (slightly different) plate
     rendering never shows as a hard-edged rectangle."""
     crop = plate.crop(box)
@@ -302,7 +314,8 @@ def build_bases(doc):
         base = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGB")
         pristine = base.copy()
         save_bullet_heart(pg, pristine, week)
-        plate = Image.open(apath("plates", f"week-{week:02d}.png")).convert("RGB")
+        plate_ext = "jpg" if PRINT else "png"
+        plate = Image.open(apath(PLATES_DIR, f"week-{week:02d}.{plate_ext}")).convert("RGB")
         d = ImageDraw.Draw(base)
         # calendar panel -> flat cell colour, hugging this page's real frame so the
         # erase never bleeds onto the callout bar or surrounding artwork; the
@@ -397,12 +410,16 @@ def build_bases(doc):
             if 1150 < x0 < 1280 and 540 < y0 and y1 < 680 and (x1 - x0) < 25:
                 box = (s(x0 - 4), s(y0 - 4), s(x1 + 4), s(y1 + 4))
                 base.paste(pristine.crop(box), box[:2])
-        base.save(apath("base", f"week-{week:02d}.png"), quality=95)
+        if PRINT:
+            base.save(apath(BASE_DIR, f"week-{week:02d}.jpg"), quality=92, subsampling=0)
+        else:
+            base.save(apath(BASE_DIR, f"week-{week:02d}.png"), quality=95)
     print("bases: done")
 
 if __name__ == "__main__":
-    extract_fruit()
+    if not PRINT:
+        extract_fruit()   # fruit comes from the XLSX at native res — scale-independent
     doc = fitz.open(PDF)
     build_plates_and_flower(doc)
     build_bases(doc)
-    print("All assets written to", os.path.join(ROOT, "assets"))
+    print(("PRINT " if PRINT else "") + "assets written to", os.path.join(ROOT, "assets"))

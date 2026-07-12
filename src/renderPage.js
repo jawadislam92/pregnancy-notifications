@@ -169,7 +169,7 @@ function renderCalendar(page, D, theme, lang, ver, week) {
 }
 
 // ---------------------------------------------------------------------------
-function renderPage(pageDesc, week, theme, lang, ver) {
+function renderPage(pageDesc, week, theme, lang, ver, forPrint) {
   const ui = UI[lang];
   const D = DESIGN[week.week];
   const parts = [];
@@ -259,7 +259,11 @@ function renderPage(pageDesc, week, theme, lang, ver) {
   // ---- calendar ----
   parts.push(renderCalendar(pageDesc, D, theme, lang, ver, week));
 
-  const bg = `/assets/base/week-${String(week.week).padStart(2, '0')}.png?v=${ver}`;
+  // Print uses the 300dpi JPEG set (assets/print); the web preview keeps the
+  // lighter 2x PNGs so pages stay fast to load.
+  const bg = forPrint
+    ? `/assets/print/week-${String(week.week).padStart(2, '0')}.jpg?v=${ver}`
+    : `/assets/base/week-${String(week.week).padStart(2, '0')}.png?v=${ver}`;
   return `<section class="page" data-week="${week.week}" style="background-image:url('${bg}')">${parts.join('\n')}</section>`;
 }
 
@@ -307,7 +311,7 @@ function renderDocument({ dueDate, lang, weeks, pages, forPrint, assetVersion, n
       date: c.date || week.primary, tint: c.tint || hexToRgba(week.accent, 0.32),
       tip: c.tip || null
     };
-    return renderPage(p, week, theme, lang, ver);
+    return renderPage(p, week, theme, lang, ver, forPrint);
   }).join('\n');
 
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8">
@@ -327,7 +331,11 @@ function renderDocument({ dueDate, lang, weeks, pages, forPrint, assetVersion, n
   html,body{ background:#e9e4dc; }
   .page{ position:relative; width:${PAGE_W}px; height:${PAGE_H}px; background-size:cover; background-repeat:no-repeat; overflow:hidden; }
   ${forPrint ? `
-    @page{ size:${PAGE_W}px ${PAGE_H}px; margin:0; }
+    /* The design's physical trim size (matches the Canva print export:
+       1440x810pt = 20x11.25in). page.pdf() scales content 4/3 so the
+       1440px layout fills it exactly; converters rasterizing at 300dpi
+       get the full 6000x3375. */
+    @page{ size:20in 11.25in; margin:0; }
     html,body{ background:#fff; }
     .page{ break-after:page; }
     .page:last-child{ break-after:auto; }

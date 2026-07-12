@@ -200,9 +200,13 @@ app.get('/pdf', async (req, res) => {
     const { chromium } = require('playwright');
     const browser = await chromium.launch();
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle' });
+    // Print bases are 300dpi JPEGs (~40MB total) — allow generous load time.
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
     await page.evaluate(() => document.fonts.ready);
-    const pdf = await page.pdf({ printBackground: true, preferCSSPageSize: true });
+    // scale 4/3 stretches the 1440px layout onto the 20in-wide @page trim
+    // (1440px * 0.75pt/px * 4/3 = 1440pt = 20in) => true print dimensions.
+    const pdf = await page.pdf({ printBackground: true, preferCSSPageSize: true,
+                                 scale: 4 / 3, timeout: 180000 });
     await browser.close();
     res.type('application/pdf')
        .setHeader('Content-Disposition', `attachment; filename="${slug(name)}-pregnancy-calendar-${lang}.pdf"`);
