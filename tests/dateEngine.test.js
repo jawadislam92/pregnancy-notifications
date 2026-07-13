@@ -2,15 +2,16 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const { buildPages, monthGrid, MILESTONES } = require('../src/dateEngine');
 
-test('produces exactly 10 pages for weeks 4..40', () => {
+test('produces exactly 37 pages, one per week 4..40', () => {
   const p = buildPages('2026-10-15');
-  assert.equal(p.length, 10);
+  assert.equal(p.length, 37);
   assert.deepEqual(p.map(x => x.week), MILESTONES);
+  assert.deepEqual(MILESTONES, Array.from({ length: 37 }, (_, i) => i + 4));
 });
 
 test('week 40 milestone is the due date; highlight is its calendar week', () => {
   const p = buildPages('2026-10-15');
-  const w40 = p[9];
+  const w40 = p[36];
   assert.equal(w40.week, 40);
   assert.equal(w40.month, 9);            // October (0-based)
   assert.equal(w40.milestoneISO, '2026-10-15');
@@ -26,13 +27,22 @@ test('demo due date maps week 4 to February; highlight is a full calendar week',
   assert.ok(w4.highlightDays.includes(5)); // the milestone day
 });
 
-test('consecutive milestones are 4 weeks (28 days) apart', () => {
+test('consecutive weekly pages are 7 days apart', () => {
   const p = buildPages('2026-10-15');
   for (let i = 1; i < p.length; i++) {
     const a = new Date(p[i - 1].milestoneISO);
     const b = new Date(p[i].milestoneISO);
-    assert.equal((b - a) / 86400000, 28);
+    assert.equal((b - a) / 86400000, 7);
   }
+});
+
+test('client scenario: due 2027-01-11, the page highlighting 2026-07-14 is week 15', () => {
+  const p = buildPages('2027-01-11');
+  const w15 = p.find(x => x.week === 15);
+  assert.equal(w15.year, 2026);
+  assert.equal(w15.month, 6);                              // July (0-based)
+  assert.deepEqual(w15.highlightDays, [13, 14, 15, 16, 17, 18, 19]);
+  assert.ok(w15.highlightDays.includes(14));               // today falls on the week-15 page
 });
 
 test('monthGrid: February 2026 has 28 days and starts on Sunday (col 6)', () => {
@@ -61,13 +71,15 @@ test('year-crossing: an early due date pushes week 4 into the previous year', ()
   assert.ok(p[0].year < 2026, `expected week-4 year < 2026, got ${p[0].year}`);
 });
 
-test('every page: highlight is consecutive days containing the milestone day', () => {
+test('every page: highlight is a contiguous band containing the span midpoint', () => {
   for (const pg of buildPages('2026-10-15')) {
     for (let i = 1; i < pg.highlightDays.length; i++) {
       assert.equal(pg.highlightDays[i] - pg.highlightDays[i - 1], 1); // one contiguous band
     }
-    assert.ok(pg.highlightDays.length <= 7);
-    const milestoneDay = Number(pg.milestoneISO.slice(8, 10));
-    assert.ok(pg.highlightDays.includes(milestoneDay), `milestone ${milestoneDay} within highlight`);
+    assert.ok(pg.highlightDays.length >= 1 && pg.highlightDays.length <= 7);
+    // midpoint = span end (milestoneISO) - 3 days; always inside the page month → in the band
+    const mid = new Date(pg.milestoneISO); mid.setUTCDate(mid.getUTCDate() - 3);
+    assert.ok(pg.highlightDays.includes(mid.getUTCDate()),
+      `midpoint ${mid.getUTCDate()} within highlight [${pg.highlightDays}]`);
   }
 });

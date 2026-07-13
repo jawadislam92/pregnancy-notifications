@@ -30,6 +30,18 @@ function hexToRgb(hex) {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 function hexToRgba(hex, a) { const [r, g, b] = hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; }
+function darken(hex, f) { const [r, g, b] = hexToRgb(hex); return `rgb(${Math.round(r * f)},${Math.round(g * f)},${Math.round(b * f)})`; }
+const pad = (w) => String(w).padStart(2, '0');
+
+// The design was drawn as 10 monthly templates (the milestone weeks). Every
+// week 4..40 reuses the NEAREST milestone's background / geometry / colours /
+// decor, and overlays its own fruit + content. `template(n)` picks that donor.
+const MILESTONES = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40];
+const isMilestone = (n) => MILESTONES.includes(n);
+const template = (n) => MILESTONES.reduce((b, m) => Math.abs(m - n) < Math.abs(b - n) ? m : b, MILESTONES[0]);
+// Fruit-illustration box per template (design coords), harvested by extract_assets.py
+let FRUITBOX = {};
+try { FRUITBOX = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'assets', 'fruitbox.json'), 'utf8')); } catch { /* built on first extract */ }
 
 // -- positioned text helpers (design-space coordinates) ----------------------
 // PDF span boxes are glyph-box anchored; line-height:1 + top anchoring puts CSS
@@ -57,7 +69,7 @@ const yFix = (p, em) => ({ ...p, y: Math.round((p.y - em * p.sz) * 10) / 10 });
 const SCRIPT_EM = 0.23, NOW_EM = 0.24;
 
 // ---------------------------------------------------------------------------
-function renderCalendar(page, D, theme, lang, ver, week) {
+function renderCalendar(page, D, theme, lang, ver, week, t) {
   const parts = [];
   const [fx0, fy0, fx1, fy1] = D.frame;
   const bounds = [fx0, ...D.cols, fx1];              // 8 column boundaries
@@ -144,8 +156,7 @@ function renderCalendar(page, D, theme, lang, ver, week) {
       parts.push(`<div style="position:absolute;left:${bounds[c] + D.num.dx}px;top:${rowTops[r] + D.num.dy}px;` +
         `font-family:${F.cal};font-weight:700;font-size:${D.num.sz}px;line-height:1.15;color:${col}">${String(day).padStart(2, '0')}</div>`);
       if (day === page.markerStart || day === page.markerEnd) {
-        const fl = week && FLOWERS.has(week.week)
-          ? `flower-${String(week.week).padStart(2, '0')}` : 'flower';
+        const fl = FLOWERS.has(t) ? `flower-${pad(t)}` : 'flower';
         parts.push(`<img src="/assets/deco/${fl}.png?v=${ver}" style="position:absolute;` +
           `left:${bounds[c + 1] - 44}px;top:${rowTops[r] + 6}px;width:32px;height:32px;object-fit:contain">`);
       }
@@ -154,12 +165,12 @@ function renderCalendar(page, D, theme, lang, ver, week) {
 
   // The design tucks a little leaf sprig into the trailing empty cell of the
   // last row (when the sprite exists for this week and the cell is empty).
-  if (week && CELL_SPRIGS.has(week.week)) {
+  if (CELL_SPRIGS.has(t)) {
     const lastRow = page.grid[page.rows - 1];
     const lastDateIdx = lastRow.reduce((a, d, i) => (d ? i : a), -1);
     if (lastDateIdx >= 0 && lastDateIdx < 6) {
       const c = lastDateIdx + 1;
-      const wk2 = String(week.week).padStart(2, '0');
+      const wk2 = pad(t);
       parts.push(`<img src="/assets/deco/cellsprig-${wk2}.png?v=${ver}" style="position:absolute;` +
         `left:${(bounds[c] + bounds[c + 1]) / 2 - 26}px;top:${(rowTops[page.rows - 1] + rowTops[page.rows]) / 2 - 22}px;` +
         `width:52px;height:46px;object-fit:contain">`);
@@ -171,8 +182,18 @@ function renderCalendar(page, D, theme, lang, ver, week) {
 // ---------------------------------------------------------------------------
 function renderPage(pageDesc, week, theme, lang, ver, forPrint) {
   const ui = UI[lang];
-  const D = DESIGN[week.week];
+  const t = template(week.week);          // the month-template this week reuses
+  const D = DESIGN[t];
   const parts = [];
+
+  // Fruit illustration. Milestone weeks keep the fruit baked into their plate;
+  // in-between weeks reuse the fruit-less template and overlay their own fruit
+  // at the template's fruit box (object-fit:contain keeps each fruit's aspect).
+  if (!isMilestone(week.week) && FRUITBOX[t]) {
+    const [fx, fy, fw, fh] = FRUITBOX[t];
+    parts.push(`<img src="/assets/fruit/week-${pad(week.week)}.png?v=${ver}" style="position:absolute;` +
+      `left:${fx}px;top:${fy}px;width:${fw}px;height:${fh}px;object-fit:contain">`);
+  }
 
   // ---- left column ----
   const monthName = MONTHS[lang][pageDesc.month];
@@ -189,7 +210,18 @@ function renderPage(pageDesc, week, theme, lang, ver, forPrint) {
   parts.push(`<div class="m-year" data-cx="172" style="position:absolute;left:${yrP.cx}px;top:${yrP.y}px;` +
     `transform:translateX(-50%);font-family:${F.now};font-size:${yrP.sz}px;line-height:normal;` +
     `color:${D.year.c || NEUTRAL};letter-spacing:.5px;white-space:nowrap">${pageDesc.year}</div>`);
-  parts.push(atCenter(yFix(D.badge, SCRIPT_EM), F.script, theme.badge, esc(ui.weekOf(week.week))));
+  // Week badge: the NUMBER is enlarged, in a crisp bold font and a strong
+  // contrasting colour so it reads at a glance (client request); the wording
+  // stays in the design's script. Centered over the baked pill.
+  const bP = yFix(D.badge, SCRIPT_EM);
+  const num = `<span style="font-family:${F.cal};font-weight:700;font-size:${Math.round(D.badge.sz * 1.3)}px;` +
+    `color:${darken(theme.badge, 0.5)};letter-spacing:.2px;margin:0 3px;vertical-align:-0.06em">${week.week}</span>`;
+  const scr = (txt) => `<span style="font-family:${F.script};color:${theme.badge}">${esc(txt)}</span>`;
+  const badgeHtml = lang === 'de'
+    ? `${num}${scr('. Schwangerschaftswoche')}`
+    : `${scr('Week')}${num}${scr('of Pregnancy')}`;
+  parts.push(`<div style="position:absolute;left:${D.badge.cx}px;top:${bP.y}px;transform:translateX(-50%);` +
+    `font-size:${D.badge.sz}px;line-height:normal;white-space:nowrap">${badgeHtml}</div>`);
   parts.push(atCenter(D.sizeOf, F.serif, D.sizeOf.c || NEUTRAL, esc(ui.sizeOf)));
   parts.push(atCenter(yFix(D.fruit, SCRIPT_EM), F.script, theme.fruit, esc(week.fruit[lang])));
   // localized measurement values (German: 1.5 cm -> 1,5 cm; 3,500 g -> 3.500 g)
@@ -221,9 +253,9 @@ function renderPage(pageDesc, week, theme, lang, ver, forPrint) {
   if (D.bullets) {
     let by = D.bullets.y;
     const bw = 168, lineStep = 16.5, gap = 11.75;
-    const wk2 = String(week.week).padStart(2, '0');
+    const wk2 = pad(t);
     week.mama[lang].forEach((b) => {
-      if (HEART_SPRITES.has(week.week)) {
+      if (HEART_SPRITES.has(t)) {
         parts.push(`<img src="/assets/deco/bullet-heart-${wk2}.png?v=${ver}" style="position:absolute;` +
           `left:${D.bullets.x - 28}px;top:${by - 1}px;width:18px;height:18px;object-fit:contain">`);
       } else {
@@ -257,13 +289,15 @@ function renderPage(pageDesc, week, theme, lang, ver, forPrint) {
     `line-height:1.12;color:${ctColor}">${ctHtml}</div></div>`);
 
   // ---- calendar ----
-  parts.push(renderCalendar(pageDesc, D, theme, lang, ver, week));
+  parts.push(renderCalendar(pageDesc, D, theme, lang, ver, week, t));
 
-  // Print uses the 300dpi JPEG set (assets/print); the web preview keeps the
-  // lighter 2x PNGs so pages stay fast to load.
+  // Background: milestone weeks use their own baked plate (fruit included);
+  // in-between weeks use the fruit-less template `tmpl-<t>` (fruit overlaid above).
+  // Print uses the 300dpi JPEG set; the web preview uses the lighter 2x PNGs.
+  const bgSlug = isMilestone(week.week) ? `week-${pad(week.week)}` : `tmpl-${pad(t)}`;
   const bg = forPrint
-    ? `/assets/print/week-${String(week.week).padStart(2, '0')}.jpg?v=${ver}`
-    : `/assets/base/week-${String(week.week).padStart(2, '0')}.png?v=${ver}`;
+    ? `/assets/print/${bgSlug}.jpg?v=${ver}`
+    : `/assets/base/${bgSlug}.png?v=${ver}`;
   return `<section class="page" data-week="${week.week}" style="background-image:url('${bg}')">${parts.join('\n')}</section>`;
 }
 
@@ -302,8 +336,8 @@ function renderDocument({ dueDate, lang, weeks, pages, forPrint, assetVersion, n
   const cover = name && name.trim() ? renderCover(name.trim(), lang, pages, ver) : '';
   const body = cover + pages.map((p, i) => {
     const week = weeks[i];
-    // Exact per-element hues harvested from the Canva PDF, with fallbacks.
-    const c = THEME[week.week] || {};
+    // Colours come from the reused month-template (the nearest milestone).
+    const c = THEME[template(week.week)] || {};
     const theme = {
       grey: NEUTRAL,
       month: c.month || week.primary, badge: c.badge || week.primary,

@@ -1,16 +1,19 @@
-// Date engine: from a single due date, derive everything the 10 pages need.
+// Date engine: from a single due date, derive everything the 37 pages need.
 //
 // Model (per the client's brief):
 //   - Pregnancy is counted week 4 -> week 40; the due date is the end of week 40.
-//   - Milestone week N is "reached" N weeks before... i.e. dueDate - (40 - N) weeks.
-//   - Each of the 10 milestone weeks (4,8,...,40) gets one page, showing the
-//     calendar month in which that milestone falls.
-//   - The gestational week is a 7-day span ending on the milestone date; those
-//     days are highlighted, with a flower marker on the first and last day.
+//   - Week N is "reached" (40 - N) weeks before the due date, i.e. its 7-day
+//     gestational span ends on dueDate - (40 - N)*7.
+//   - Each pregnancy week 4..40 (37 in total) gets its own page, showing the
+//     calendar month in which that week mostly falls.
+//   - The week is anchored by the MIDPOINT of its 7-day span (span end - 3): the
+//     page month and the highlighted Mon–Sun row are chosen from the midpoint, so
+//     the highlight holds the majority of the span and "today" lands on the
+//     correctly-numbered page. (Anchoring to the span END rounded a day ahead.)
 //
 // All maths is done in UTC to avoid timezone/DST drift.
 
-const MILESTONES = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40];
+const MILESTONES = Array.from({ length: 37 }, (_, i) => i + 4); // weeks 4,5,...,40
 const DAY = 86400000;
 const WEEK_SPAN_DAYS = 7; // length of the highlighted gestational week
 
@@ -40,19 +43,20 @@ function monthGrid(year, month /*0-11*/) {
   return { weeks, daysInMonth, startCol };
 }
 
-// For a given due date, produce the 10 page descriptors.
+// For a given due date, produce the 37 page descriptors (one per week 4..40).
 function buildPages(dueDateStr) {
   const due = toUTC(dueDateStr);
   return MILESTONES.map((week) => {
-    const milestoneDate = addDays(due, -(40 - week) * 7);
-    const { y, m } = ymd(milestoneDate);
+    const milestoneDate = addDays(due, -(40 - week) * 7); // last day of the week's 7-day span
+    const anchor = addDays(milestoneDate, -3);            // span midpoint (span = md-6 .. md)
+    const { y, m } = ymd(anchor);                         // page month = month holding the majority of the span
     const grid = monthGrid(y, m);
 
-    // Highlight the whole CALENDAR WEEK (one Mon–Sun grid row) that the milestone
-    // falls in. This keeps the highlight a single, contiguous band every time,
-    // instead of a 7-day span that wraps across two rows or gets cut at a month
-    // boundary (which read as an inconsistent 3–4 day highlight).
-    const weekMonday = addDays(milestoneDate, -mondayIndex(milestoneDate));
+    // Highlight the whole CALENDAR WEEK (one Mon–Sun grid row) that the span's
+    // MIDPOINT falls in. Anchoring to the midpoint (rather than the span end)
+    // keeps the highlight a single contiguous band holding the majority of the
+    // gestational week, and makes "today" land on the correctly-numbered page.
+    const weekMonday = addDays(anchor, -mondayIndex(anchor));
     const highlightDays = [];
     for (let i = 0; i < 7; i++) {
       const p = ymd(addDays(weekMonday, i));

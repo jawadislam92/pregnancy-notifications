@@ -6,3 +6,4 @@ output/
 # runtime data
 data/
 assets/print-plates/
+scripts/weeks_parsed.json

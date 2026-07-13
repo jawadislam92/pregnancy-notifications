@@ -17,8 +17,11 @@ Outputs (committed to the repo):
 
 Requires: pymupdf, openpyxl, pillow   (pip install pymupdf openpyxl pillow)
 """
-import fitz, openpyxl, io, os, sys, statistics
-from PIL import Image, ImageDraw
+import fitz, openpyxl, io, os, sys, json, statistics
+from collections import deque
+from PIL import Image, ImageDraw, ImageFilter, ImageChops
+
+FRUITBOX = {}   # week -> [x, y, w, h] fruit-illustration box (design coords), for the overlay
 
 PDF  = r"C:\Users\jawad\Downloads\Documents\canva.pdf"
 XLSX = r"C:\Users\jawad\Downloads\Pregnancy Calendar Overview.xlsx"
@@ -37,14 +40,50 @@ def apath(*p):
     fp = os.path.join(ROOT, "assets", *p); os.makedirs(os.path.dirname(fp), exist_ok=True); return fp
 def s(v): return int(round(v * SCALE))
 
+def _largest_blob(binary):
+    """0/255 mask of the largest connected opaque blob in a small 'L' image."""
+    w, h = binary.size; px = binary.load(); seen = bytearray(w * h); best = []
+    for sy in range(h):
+        for sx in range(w):
+            if seen[sy * w + sx] or px[sx, sy] < 128: continue
+            comp = []; dq = deque([(sx, sy)]); seen[sy * w + sx] = 1
+            while dq:
+                x, y = dq.popleft(); comp.append((x, y))
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < w and 0 <= ny < h and not seen[ny * w + nx] and px[nx, ny] >= 128:
+                        seen[ny * w + nx] = 1; dq.append((nx, ny))
+            if len(comp) > len(best): best = comp
+    m = Image.new("L", (w, h), 0); mp = m.load()
+    for x, y in best: mp[x, y] = 255
+    return m
+
+def key_fruit_bg(im, thresh=42):
+    """The XLSX fruit illustrations sit on a pale opaque background. Key it out
+    (border-seeded flood fill so pale interior fruit parts survive), keep only
+    the largest blob (drops the watercolor splatter specks), crop to content."""
+    im = im.convert("RGB"); w, h = im.size; work = im.copy(); SENT = (255, 0, 255)
+    for sx, sy in [(0, 0), (w-1, 0), (0, h-1), (w-1, h-1), (w//2, 0), (w//2, h-1), (0, h//2), (w-1, h//2)]:
+        try: ImageDraw.floodfill(work, (sx, sy), SENT, thresh=thresh)
+        except Exception: pass
+    wp = work.load(); a = Image.new("L", (w, h), 255); ap = a.load()
+    for y in range(h):
+        for x in range(w):
+            if wp[x, y] == SENT: ap[x, y] = 0
+    small = a.resize((220, 220), Image.BILINEAR).point(lambda v: 255 if v > 110 else 0)
+    comp = _largest_blob(small).filter(ImageFilter.MaxFilter(7))   # dilate to keep soft edge/shadow
+    a = ImageChops.multiply(a, comp.resize((w, h), Image.BILINEAR)).filter(ImageFilter.GaussianBlur(1.2))
+    out = im.convert("RGBA"); out.putalpha(a); bb = a.getbbox()
+    return out.crop(bb) if bb else out
+
 def extract_fruit():
     wb = openpyxl.load_workbook(XLSX)
     ws = wb.active
     for img in getattr(ws, "_images", []):
         row = img.anchor._from.row            # 0-based; sheet row 2 == week 4
         week = 4 + (row - 1)
-        im = Image.open(io.BytesIO(img._data())).convert("RGBA")
-        im.save(apath("fruit", f"week-{week:02d}.png"))
+        im = Image.open(io.BytesIO(img._data()))
+        key_fruit_bg(im).save(apath("fruit", f"week-{week:02d}.png"))
     print("fruit: done")
 
 def load_rgba(doc, xref, cache={}):
@@ -61,12 +100,46 @@ def load_rgba(doc, xref, cache={}):
     cache[xref] = im
     return im
 
+def _detail(img):
+    """Luminance stddev over the opaque region. Fruit illustrations are painted
+    (dark eyes, outline, texture) → high variance; watercolor washes are smooth
+    and pale → ~0. A robust way to tell the fruit from the washes behind it."""
+    im = img.convert("RGBA").resize((80, 80)); px = im.load(); lums = []
+    for y in range(80):
+        for x in range(80):
+            r, g, b, a = px[x, y]
+            if a < 128: continue
+            lums.append(0.299 * r + 0.587 * g + 0.114 * b)
+    if len(lums) < 50: return 0.0
+    m = sum(lums) / len(lums)
+    return (sum((v - m) ** 2 for v in lums) / len(lums)) ** 0.5
+
+def find_fruit(doc, pg):
+    """(xref, visible_box) of the fruit illustration in design coords, or (None,
+    None). The fruit is the highest-detail raster in the left fruit zone."""
+    best = (6.0, None, None)   # require some detail so a page with no fruit → None
+    for im in pg.get_image_info(xrefs=True):
+        x0, y0, x1, y1 = im['bbox']; w, h = x1 - x0, y1 - y0; cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        if im['xref'] <= 0 or not (cx < 430 and 300 < cy < 820 and w > 120 and h > 120):
+            continue
+        sd = _detail(load_rgba(doc, im['xref']))
+        if sd > best[0]: best = (sd, im['xref'], (x0, y0, x1, y1))
+    xref, pb = best[1], best[2]
+    if xref is None: return None, None
+    img = load_rgba(doc, xref); vb = img.split()[3].getbbox(); sw, sh = img.size
+    if not vb: return xref, pb
+    X0, Y0, X1, Y1 = pb
+    return xref, (X0 + vb[0] / sw * (X1 - X0), Y0 + vb[1] / sh * (Y1 - Y0),
+                  X0 + vb[2] / sw * (X1 - X0), Y0 + vb[3] / sh * (Y1 - Y0))
+
 def build_plates_and_flower(doc):
     saved_flower = False
     for pi, week in enumerate(MILESTONES):
         pg = doc[pi]
         W, H = int(pg.rect.width * SCALE), int(pg.rect.height * SCALE)
         canvas = Image.new("RGBA", (W, H), (251, 247, 242, 255))
+        canvas_nf = Image.new("RGBA", (W, H), (251, 247, 242, 255))  # fruit-less twin
+        fruit_xref, _ = find_fruit(doc, pg)
         saved_page_flower = False
         for im in sorted(pg.get_image_info(xrefs=True),
                          key=lambda d: -((d['bbox'][2]-d['bbox'][0])*(d['bbox'][3]-d['bbox'][1]))):
@@ -82,14 +155,15 @@ def build_plates_and_flower(doc):
                 if not saved_flower:
                     src.save(apath("deco", "flower.png")); saved_flower = True
                 continue
-            canvas.alpha_composite(src.resize((max(1, s(w)), max(1, s(h))), Image.LANCZOS),
-                                   (s(x0), s(y0)))
-        plate = canvas.convert("RGB")
-        if PRINT:
-            plate.save(apath(PLATES_DIR, f"week-{week:02d}.jpg"), quality=95, subsampling=0)
-        else:
-            plate.save(apath(PLATES_DIR, f"week-{week:02d}.png"), quality=95)
-    print("plates + flower + bullet hearts: done")
+            sized = src.resize((max(1, s(w)), max(1, s(h))), Image.LANCZOS)
+            canvas.alpha_composite(sized, (s(x0), s(y0)))
+            if im['xref'] != fruit_xref:          # fruit-less twin keeps the wash, drops the fruit
+                canvas_nf.alpha_composite(sized, (s(x0), s(y0)))
+        ext = "jpg" if PRINT else "png"
+        kw = dict(quality=95, subsampling=0) if PRINT else dict(quality=95)
+        canvas.convert("RGB").save(apath(PLATES_DIR, f"week-{week:02d}.{ext}"), **kw)
+        canvas_nf.convert("RGB").save(apath(PLATES_DIR, f"tmpl-{week:02d}.{ext}"), **kw)
+    print("plates (+ fruit-less templates) + flower: done")
 
 def erase_interp(base, x0, y0, x1, y1, mask=None, ring=(4, 18), force_horiz=False):
     """Erase a rect by blending between the median colours of strips just
@@ -410,11 +484,28 @@ def build_bases(doc):
             if 1150 < x0 < 1280 and 540 < y0 and y1 < 680 and (x1 - x0) < 25:
                 box = (s(x0 - 4), s(y0 - 4), s(x1 + 4), s(y1 + 4))
                 base.paste(pristine.crop(box), box[:2])
-        if PRINT:
-            base.save(apath(BASE_DIR, f"week-{week:02d}.jpg"), quality=92, subsampling=0)
-        else:
-            base.save(apath(BASE_DIR, f"week-{week:02d}.png"), quality=95)
-    print("bases: done")
+        ext = "jpg" if PRINT else "png"
+        kw = dict(quality=92, subsampling=0) if PRINT else dict(quality=95)
+        base.save(apath(BASE_DIR, f"week-{week:02d}.{ext}"), **kw)   # milestone bg (fruit baked)
+
+        # Fruit-less template base: paste the fruit region from the fruit-less
+        # plate over a copy, removing the baked fruit. In-between weeks reuse this
+        # and overlay their OWN fruit at render time (box recorded in fruitbox.json).
+        _, fb = find_fruit(pg.parent, pg)
+        if fb:
+            fx0, fy0, fx1, fy1 = fb
+            FRUITBOX[week] = [round(fx0), round(fy0), round(fx1 - fx0), round(fy1 - fy0)]
+            tmpl_plate = Image.open(apath(PLATES_DIR, f"tmpl-{week:02d}.{ext}")).convert("RGB")
+            tmpl = base.copy()
+            # cover the whole fruit (some fruits reach up near the name zone);
+            # the name text is re-overlaid at render, so pasting wash here is safe.
+            box = (s(max(20, fx0 - 16)), s(max(355, fy0 - 16)),
+                   s(min(392, fx1 + 16)), s(min(715, fy1 + 20)))
+            paste_feathered(tmpl, tmpl_plate, box)
+            tmpl.save(apath(BASE_DIR, f"tmpl-{week:02d}.{ext}"), **kw)
+    if not PRINT:
+        json.dump(FRUITBOX, open(apath("fruitbox.json"), "w"), indent=0)
+    print("bases (+ fruit-less templates): done")
 
 if __name__ == "__main__":
     if not PRINT:

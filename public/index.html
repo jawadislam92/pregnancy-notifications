@@ -86,14 +86,15 @@
   const esc = (s) => (s==null?'':String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const q = (c) => 'due=' + encodeURIComponent(c.due_date) + '&lang=' + c.lang + '&name=' + encodeURIComponent(c.name);
 
-  // Current gestational week from due date (due date = end of week 40)
+  // Current gestational week from due date (due date = last day of week 40).
+  // "Week N" = the week in progress: N-1 completed weeks + some days → 40 - floor(daysToDue/7).
   function weekNow(due){
     const d = new Date(due + 'T00:00:00'); const today = new Date(); today.setHours(0,0,0,0);
     const daysToDue = Math.round((d - today) / 86400000);
-    const wk = 40 - daysToDue / 7;
+    const wk = 40 - Math.floor(daysToDue / 7);
     if (wk < 1) return '<span class="sub">not started</span>';
-    if (wk > 41) return '<span class="sub">due passed</span>';
-    return '<span class="pill">Week ' + Math.round(wk) + '</span>';
+    if (wk > 40) return '<span class="sub">due passed</span>';
+    return '<span class="pill">Week ' + wk + '</span>';
   }
   const fmt = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(); };
 
