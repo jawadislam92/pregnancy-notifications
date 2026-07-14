@@ -48,7 +48,12 @@ function buildPages(dueDateStr) {
   const due = toUTC(dueDateStr);
   return MILESTONES.map((week) => {
     const milestoneDate = addDays(due, -(40 - week) * 7); // last day of the week's 7-day span
-    const anchor = addDays(milestoneDate, -3);            // span midpoint (span = md-6 .. md)
+    // Week 40 ends ON the due date → anchor it to the due date itself so the last
+    // page always shows the due-date month with the due week highlighted. (For a
+    // due date in the first 1–3 days of a month the midpoint sits in the previous
+    // month, which dropped the due-date month from the calendar entirely.) Every
+    // other week anchors to the span midpoint (see below).
+    const anchor = week === 40 ? milestoneDate : addDays(milestoneDate, -3);
     const { y, m } = ymd(anchor);                         // page month = month holding the majority of the span
     const grid = monthGrid(y, m);
 
