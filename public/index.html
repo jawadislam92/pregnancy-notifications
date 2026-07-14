@@ -86,14 +86,17 @@
   const esc = (s) => (s==null?'':String(s)).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const q = (c) => 'due=' + encodeURIComponent(c.due_date) + '&lang=' + c.lang + '&name=' + encodeURIComponent(c.name);
 
-  // Current gestational week from due date (due date = last day of week 40).
-  // "Week N" = the week in progress: N-1 completed weeks + some days → 40 - floor(daysToDue/7).
+  // Current pregnancy week = the gestational week in progress (the client's
+  // convention: e.g. 14w1d along → "Week 15"). due date = end of week 40, so
+  // gestational age = 280 − days-to-due; week in progress = floor(GA/7) + 1.
+  // (The old 40 − floor(days/7) landed a week low at exact week boundaries.)
   function weekNow(due){
     const d = new Date(due + 'T00:00:00'); const today = new Date(); today.setHours(0,0,0,0);
-    const daysToDue = Math.round((d - today) / 86400000);
-    const wk = 40 - Math.floor(daysToDue / 7);
+    if (today > d) return '<span class="sub">due passed</span>';
+    const gaDays = 280 - Math.round((d - today) / 86400000);
+    let wk = Math.floor(gaDays / 7) + 1;
     if (wk < 1) return '<span class="sub">not started</span>';
-    if (wk > 40) return '<span class="sub">due passed</span>';
+    if (wk > 40) wk = 40;                       // full term (on/just before the due date)
     return '<span class="pill">Week ' + wk + '</span>';
   }
   const fmt = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(); };
