@@ -138,9 +138,13 @@ def build_plates_and_flower(doc):
         pg = doc[pi]
         W, H = int(pg.rect.width * SCALE), int(pg.rect.height * SCALE)
         canvas = Image.new("RGBA", (W, H), (251, 247, 242, 255))
-        canvas_nf = Image.new("RGBA", (W, H), (251, 247, 242, 255))  # fruit-less twin
-        fruit_xref, _ = find_fruit(doc, pg)
+        canvas_clean = Image.new("RGBA", (W, H), (251, 247, 242, 255))  # clean fruit-zone twin
         saved_page_flower = False
+        # a raster is "fruit-zone clutter" (the fruit or any wash blob behind it) if
+        # its centre is in the left fruit area — excluded from the clean twin so the
+        # zone becomes plain cream (the fruit + a uniform wash are overlaid at render)
+        def fruit_zone_clutter(cx, cy, w, h):
+            return cx < 400 and 335 < cy < 700
         for im in sorted(pg.get_image_info(xrefs=True),
                          key=lambda d: -((d['bbox'][2]-d['bbox'][0])*(d['bbox'][3]-d['bbox'][1]))):
             x0, y0, x1, y1 = im['bbox']; w, h = x1-x0, y1-y0
@@ -157,12 +161,12 @@ def build_plates_and_flower(doc):
                 continue
             sized = src.resize((max(1, s(w)), max(1, s(h))), Image.LANCZOS)
             canvas.alpha_composite(sized, (s(x0), s(y0)))
-            if im['xref'] != fruit_xref:          # fruit-less twin keeps the wash, drops the fruit
-                canvas_nf.alpha_composite(sized, (s(x0), s(y0)))
+            if not fruit_zone_clutter(cx, cy, w, h):   # clean twin drops fruit + wash blobs
+                canvas_clean.alpha_composite(sized, (s(x0), s(y0)))
         ext = "jpg" if PRINT else "png"
         kw = dict(quality=95, subsampling=0) if PRINT else dict(quality=95)
         canvas.convert("RGB").save(apath(PLATES_DIR, f"week-{week:02d}.{ext}"), **kw)
-        canvas_nf.convert("RGB").save(apath(PLATES_DIR, f"tmpl-{week:02d}.{ext}"), **kw)
+        canvas_clean.convert("RGB").save(apath(PLATES_DIR, f"tmpl-{week:02d}.{ext}"), **kw)
     print("plates (+ fruit-less templates) + flower: done")
 
 def erase_interp(base, x0, y0, x1, y1, mask=None, ring=(4, 18), force_horiz=False):
@@ -318,7 +322,9 @@ def month_decor_boxes(pg):
                 elif isinstance(pt, fitz.Rect): xs += [pt.x0, pt.x1]; ys += [pt.y0, pt.y1]
         if not xs: continue
         bx0, by0, bx1, by1 = min(xs), min(ys), max(xs), max(ys)
-        if 245 < bx0 and bx1 < 385 and 30 < by0 and by1 < 175 and (bx1 - bx0) < 90:
+        # only the heart+sprig above the year (by1 < 150) — the old upper bound of
+        # 175 also grabbed a stray mauve fragment sitting next to "2026" (the "v").
+        if 245 < bx0 and bx1 < 385 and 30 < by0 and by1 < 150 and (bx1 - bx0) < 90:
             pts.append([bx0, by0, bx1, by1])
     # merge overlapping/nearby fragments into clusters
     changed = True
@@ -380,7 +386,9 @@ def restore_keyed(base, pristine, bx0, by0, bx1, by1, thresh=12, slope=14):
     base.paste(crop, box[:2], crop)
 
 def build_bases(doc):
-    WASH_BOX = (0, 0, s(354), s(180))              # month wash block, to the page corner
+    WASH_BOX = (0, 0, s(354), s(204))              # month wash block; y204 covers the
+    #   template month's own y-descender (e.g. February/January) which used to leave
+    #   a stray mauve "v" below the old y180 boundary. Stays above the badge pill (~212).
     FRUIT_BOX = (0, s(292), s(390), s(432))        # sizeOf + fruit-name zone
     for pi, week in enumerate(MILESTONES):
         pg = doc[pi]
@@ -485,27 +493,19 @@ def build_bases(doc):
                 box = (s(x0 - 4), s(y0 - 4), s(x1 + 4), s(y1 + 4))
                 base.paste(pristine.crop(box), box[:2])
         ext = "jpg" if PRINT else "png"
-        kw = dict(quality=92, subsampling=0) if PRINT else dict(quality=95)
-        base.save(apath(BASE_DIR, f"week-{week:02d}.{ext}"), **kw)   # milestone bg (fruit baked)
+        kw = dict(quality=96, subsampling=0) if PRINT else dict(quality=95)   # q96: crisper baked art
+        base.save(apath(BASE_DIR, f"week-{week:02d}.{ext}"), **kw)   # (legacy baked bg; unused now)
 
-        # Fruit-less template base: paste the fruit region from the fruit-less
-        # plate over a copy, removing the baked fruit. In-between weeks reuse this
-        # and overlay their OWN fruit at render time (box recorded in fruitbox.json).
-        _, fb = find_fruit(pg.parent, pg)
-        if fb:
-            fx0, fy0, fx1, fy1 = fb
-            FRUITBOX[week] = [round(fx0), round(fy0), round(fx1 - fx0), round(fy1 - fy0)]
-            tmpl_plate = Image.open(apath(PLATES_DIR, f"tmpl-{week:02d}.{ext}")).convert("RGB")
-            tmpl = base.copy()
-            # cover the whole fruit (some fruits reach up near the name zone);
-            # the name text is re-overlaid at render, so pasting wash here is safe.
-            box = (s(max(20, fx0 - 16)), s(max(355, fy0 - 16)),
-                   s(min(392, fx1 + 16)), s(min(715, fy1 + 20)))
-            paste_feathered(tmpl, tmpl_plate, box)
-            tmpl.save(apath(BASE_DIR, f"tmpl-{week:02d}.{ext}"), **kw)
-    if not PRINT:
-        json.dump(FRUITBOX, open(apath("fruitbox.json"), "w"), indent=0)
-    print("bases (+ fruit-less templates): done")
+        # Standardized template base: paste the CLEAN plate (no fruit, no wash) over
+        # the whole fruit zone, wiping the fruit + wash blob + scattered decorations
+        # (burst-dashes, dots, spiral, flower, hearts) to plain cream. Every week
+        # reuses this and overlays its own fruit + a uniform soft wash at render time.
+        FRUIT_ZONE = (s(4), s(332), s(396), s(694))     # x5..396, y332..694 (below name, above size icons ~710)
+        tmpl_plate = Image.open(apath(PLATES_DIR, f"tmpl-{week:02d}.{ext}")).convert("RGB")
+        tmpl = base.copy()
+        paste_feathered(tmpl, tmpl_plate, FRUIT_ZONE)
+        tmpl.save(apath(BASE_DIR, f"tmpl-{week:02d}.{ext}"), **kw)
+    print("bases (+ clean templates): done")
 
 if __name__ == "__main__":
     if not PRINT:

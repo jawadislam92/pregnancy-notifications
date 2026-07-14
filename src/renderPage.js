@@ -40,8 +40,9 @@ const MILESTONES = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40];
 const isMilestone = (n) => MILESTONES.includes(n);
 const template = (n) => MILESTONES.reduce((b, m) => Math.abs(m - n) < Math.abs(b - n) ? m : b, MILESTONES[0]);
 // Fruit-illustration box per template (design coords), harvested by extract_assets.py
-let FRUITBOX = {};
-try { FRUITBOX = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'assets', 'fruitbox.json'), 'utf8')); } catch { /* built on first extract */ }
+// One uniform fruit box for every week (design coords), so the fruit sits at the
+// same size/position on every page. object-fit:contain preserves each aspect.
+const FRUIT_BOX = { x: 48, y: 402, w: 284, h: 246 };
 
 // -- positioned text helpers (design-space coordinates) ----------------------
 // PDF span boxes are glyph-box anchored; line-height:1 + top anchoring puts CSS
@@ -186,14 +187,16 @@ function renderPage(pageDesc, week, theme, lang, ver, forPrint) {
   const D = DESIGN[t];
   const parts = [];
 
-  // Fruit illustration. Milestone weeks keep the fruit baked into their plate;
-  // in-between weeks reuse the fruit-less template and overlay their own fruit
-  // at the template's fruit box (object-fit:contain keeps each fruit's aspect).
-  if (!isMilestone(week.week) && FRUITBOX[t]) {
-    const [fx, fy, fw, fh] = FRUITBOX[t];
-    parts.push(`<img src="/assets/fruit/week-${pad(week.week)}.png?v=${ver}" style="position:absolute;` +
-      `left:${fx}px;top:${fy}px;width:${fw}px;height:${fh}px;object-fit:contain">`);
-  }
+  // Fruit zone — identical on every page: a soft themed wash, then the week's own
+  // fruit centered in one fixed box (object-fit:contain preserves each aspect).
+  // The template background here is cleaned to plain cream, so nothing floats.
+  const fb = FRUIT_BOX;
+  const wax = theme.tint || hexToRgba(theme.fruit, 0.2);
+  parts.push(`<div style="position:absolute;left:${fb.x - 8}px;top:${fb.y + 34}px;` +
+    `width:${fb.w + 16}px;height:${fb.h - 26}px;border-radius:50%;filter:blur(15px);` +
+    `background:radial-gradient(ellipse at 50% 52%, ${wax} 0%, ${wax} 48%, transparent 78%)"></div>`);
+  parts.push(`<img src="/assets/fruit/week-${pad(week.week)}.png?v=${ver}" style="position:absolute;` +
+    `left:${fb.x}px;top:${fb.y}px;width:${fb.w}px;height:${fb.h}px;object-fit:contain">`);
 
   // ---- left column ----
   const monthName = MONTHS[lang][pageDesc.month];
@@ -210,12 +213,15 @@ function renderPage(pageDesc, week, theme, lang, ver, forPrint) {
   parts.push(`<div class="m-year" data-cx="172" style="position:absolute;left:${yrP.cx}px;top:${yrP.y}px;` +
     `transform:translateX(-50%);font-family:${F.now};font-size:${yrP.sz}px;line-height:normal;` +
     `color:${D.year.c || NEUTRAL};letter-spacing:.5px;white-space:nowrap">${pageDesc.year}</div>`);
-  // Week badge: the NUMBER is enlarged, in a crisp bold font and a strong
-  // contrasting colour so it reads at a glance (client request); the wording
-  // stays in the design's script. Centered over the baked pill.
+  // Week badge: the NUMBER stays in the design's Brittany script but is made
+  // noticeably LARGER and a strong dark contrasting colour so it reads at a
+  // glance. (Synthetic bold / text-stroke are avoided: Chromium exports those as
+  // Type3 glyphs, which print/zoom blurry — size + colour keep it crisp vector.)
   const bP = yFix(D.badge, SCRIPT_EM);
-  const num = `<span style="font-family:${F.cal};font-weight:700;font-size:${Math.round(D.badge.sz * 1.3)}px;` +
-    `color:${darken(theme.badge, 0.5)};letter-spacing:.2px;margin:0 3px;vertical-align:-0.06em">${week.week}</span>`;
+  const numCol = darken(theme.badge, 0.42);
+  const num = `<span style="font-family:${F.script};` +
+    `font-size:${Math.round(D.badge.sz * 1.34)}px;` +
+    `color:${numCol};margin:0 4px">${week.week}</span>`;
   const scr = (txt) => `<span style="font-family:${F.script};color:${theme.badge}">${esc(txt)}</span>`;
   const badgeHtml = lang === 'de'
     ? `${num}${scr('. Schwangerschaftswoche')}`
@@ -291,10 +297,10 @@ function renderPage(pageDesc, week, theme, lang, ver, forPrint) {
   // ---- calendar ----
   parts.push(renderCalendar(pageDesc, D, theme, lang, ver, week, t));
 
-  // Background: milestone weeks use their own baked plate (fruit included);
-  // in-between weeks use the fruit-less template `tmpl-<t>` (fruit overlaid above).
+  // Background: every week uses its month-template with a cleaned fruit zone
+  // (`tmpl-<t>`); the fruit + soft wash are overlaid above, uniformly.
   // Print uses the 300dpi JPEG set; the web preview uses the lighter 2x PNGs.
-  const bgSlug = isMilestone(week.week) ? `week-${pad(week.week)}` : `tmpl-${pad(t)}`;
+  const bgSlug = `tmpl-${pad(t)}`;
   const bg = forPrint
     ? `/assets/print/${bgSlug}.jpg?v=${ver}`
     : `/assets/base/${bgSlug}.png?v=${ver}`;
@@ -306,8 +312,9 @@ function renderCover(name, lang, pages, ver) {
   const t = lang === 'de'
     ? { for: 'Ein Schwangerschaftskalender für', sub: 'Schwangerschaftsreise', weeks: 'Woche 4–40' }
     : { for: 'A pregnancy calendar for', sub: 'Pregnancy Journey', weeks: 'Weeks 4–40' };
+  const last = pages[pages.length - 1];   // the week-40 page (due-date month)
   const start = `${MONTHS[lang][pages[0].month]} ${pages[0].year}`;
-  const end = `${MONTHS[lang][pages[9].month]} ${pages[9].year}`;
+  const end = `${MONTHS[lang][last.month]} ${last.year}`;
   const primary = '#b267a3', grey = NEUTRAL;
   // Shrink the name for long entries so it never runs off the page, and give
   // it breathing room scaled to its size — Brittany's swashes reach far above
@@ -354,7 +361,7 @@ function renderDocument({ dueDate, lang, weeks, pages, forPrint, assetVersion, n
      Brittany Signature (script) · CMU Serif (body) · Open Sauce One (calendar)
      Poppins stands in for "Now" (year figures); Nunito for size/weight values. */
   @font-face{ font-family:'Script'; src:url('/fonts/brittany.ttf') format('truetype'); font-display:block; }
-  @font-face{ font-family:'BodySerif'; src:url('/fonts/cmunrm.otf') format('opentype'); font-weight:400; font-display:block; }
+  @font-face{ font-family:'BodySerif'; src:url('/fonts/cmunrm.ttf') format('truetype'); font-weight:400; font-display:block; }
   @font-face{ font-family:'CalSans'; src:url('/fonts/opensauce-regular.ttf') format('truetype'); font-weight:400; font-display:block; }
   @font-face{ font-family:'CalSans'; src:url('/fonts/opensauce-bold.ttf') format('truetype'); font-weight:700; font-display:block; }
   @font-face{ font-family:'Geo'; src:url('/fonts/poppins-500.woff2') format('woff2'); font-weight:500; font-display:block; }
